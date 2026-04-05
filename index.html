@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>スタッフ登録 | シフト管理システム</title>
+  <title>Staff Registration | シフト管理システム</title>
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      font-family: 'Hiragino Sans', 'Noto Sans JP', 'Segoe UI', sans-serif;
       background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
       min-height: 100vh;
       display: flex;
@@ -36,14 +36,21 @@
       box-shadow: 0 8px 24px rgba(6,199,85,0.3);
     }
     h1 { color: #fff; font-size: 20px; font-weight: 700; text-align: center; }
+    .subtitle { color: rgba(255,255,255,0.5); font-size: 13px; text-align: center; margin-top: 4px; }
     .store-badge {
       display: inline-block;
       background: linear-gradient(135deg, #06c755, #00a8cc);
       color: #fff; font-size: 13px; font-weight: 600;
-      padding: 4px 14px; border-radius: 20px; margin-top: 8px;
+      padding: 4px 14px; border-radius: 20px; margin-top: 10px;
     }
-    .form-group { margin-bottom: 18px; }
-    label { display: block; color: rgba(255,255,255,0.7); font-size: 13px; font-weight: 600; margin-bottom: 8px; letter-spacing: 0.5px; }
+    .form-group { margin-bottom: 20px; }
+    label {
+      display: block;
+      color: rgba(255,255,255,0.7);
+      font-size: 13px; font-weight: 600;
+      margin-bottom: 8px; letter-spacing: 0.5px;
+    }
+    label span { color: rgba(255,255,255,0.4); font-weight: 400; font-size: 12px; margin-left: 6px; }
     input {
       width: 100%; padding: 14px 16px;
       background: rgba(255,255,255,0.08);
@@ -83,24 +90,25 @@
   <div class="logo">
     <div class="logo-icon">📖</div>
     <h1>スタッフ登録</h1>
+    <p class="subtitle">Staff Registration</p>
     <div class="store-badge" id="storeBadge">読み込み中...</div>
   </div>
-  <div id="loadingMsg" class="loading">…認証中</div>
+
+  <div id="loadingMsg" class="loading">…認証中 / Authenticating</div>
+
   <form id="regForm" style="display:none">
     <div class="form-group">
-      <label>氏名（漢字）</label>
-      <input type="text" id="name" placeholder="例：山田 太郎" required>
+      <label>名前 / Name <span>何語でもOK / Any language</span></label>
+      <input type="text" id="name"
+        placeholder="例: 山田 太郎 / Yamada Taro" required>
     </div>
     <div class="form-group">
-      <label>フリガナ</label>
-      <input type="text" id="furigana" placeholder="例：ヤマダ タロウ" required>
-    </div>
-    <div class="form-group">
-      <label>LINE ID（自動取得）</label>
+      <label>LINE ID <span>自動取得 / Auto</span></label>
       <div class="uid-display" id="uidDisplay">認証中...</div>
     </div>
-    <button type="submit" class="submit-btn" id="submitBtn">📝 登録する</button>
+    <button type="submit" class="submit-btn" id="submitBtn">📝 登録する / Register</button>
   </form>
+
   <div id="statusMsg" class="status"></div>
 </div>
 
@@ -129,7 +137,7 @@
       document.getElementById('regForm').style.display = 'block';
     })
     .catch(err => {
-      document.getElementById('loadingMsg').textContent = '認証エラー: ' + err.message;
+      document.getElementById('loadingMsg').textContent = '認証エラー / Auth error: ' + err.message;
     });
 
   document.getElementById('regForm').addEventListener('submit', async (e) => {
@@ -137,13 +145,12 @@
     const btn = document.getElementById('submitBtn');
     const status = document.getElementById('statusMsg');
     btn.disabled = true;
-    btn.textContent = '送信中...';
+    btn.textContent = '送信中... / Sending';
 
     const payload = {
       uid: lineProfile.userId,
       display_name: lineProfile.displayName,
       name: document.getElementById('name').value.trim(),
-      furigana: document.getElementById('furigana').value.trim(),
       store: store,
       store_name: storeName,
       registered_at: new Date().toISOString()
@@ -157,16 +164,16 @@
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       status.className = 'status success';
-      status.textContent = '✅ 登録が完了しました！';
+      status.textContent = '✅ 登録が完了しました / Registration complete!';
       status.style.display = 'block';
       document.getElementById('regForm').style.display = 'none';
-      setTimeout(() => liff.closeWindow(), 2000);
+      setTimeout(() => liff.closeWindow(), 2500);
     } catch(err) {
       status.className = 'status error';
-      status.textContent = '⚠️ 送信エラー。はじめからお試しください。';
+      status.textContent = '⚠️ 送信エラー / Send error. Please try again.';
       status.style.display = 'block';
       btn.disabled = false;
-      btn.textContent = '📝 登録する';
+      btn.textContent = '📝 登録する / Register';
     }
   });
 </script>
