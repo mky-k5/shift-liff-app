@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>スタッフ登録 | シフト管理システム</title>
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(255,255,255,0.07);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 24px;
+      padding: 36px 28px;
+      width: 100%;
+      max-width: 420px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    .logo {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .logo-icon {
+      width: 64px;
+      height: 64px;
+      background: linear-gradient(135deg, #06c755, #00a8cc);
+      border-radius: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin-bottom: 12px;
+      box-shadow: 0 8px 24px rgba(6,199,85,0.3);
+    }
+    h1 {
+      color: #fff;
+      font-size: 20px;
+      font-weight: 700;
+      text-align: center;
+    }
+    .store-badge {
+      display: inline-block;
+      background: linear-gradient(135deg, #06c755, #00a8cc);
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-top: 8px;
+    }
+    .form-group {
+      margin-bottom: 18px;
+    }
+    label {
+      display: block;
+      color: rgba(255,255,255,0.7);
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      letter-spacing: 0.5px;
+    }
+    input {
+      width: 100%;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      color: #fff;
+      font-size: 16px;
+      font-family: inherit;
+      transition: all 0.2s;
+      outline: none;
+    }
+    input::placeholder { color: rgba(255,255,255,0.3); }
+    input:focus {
+      border-color: #06c755;
+      background: rgba(6,199,85,0.08);
+      box-shadow: 0 0 0 3px rgba(6,199,85,0.15);
+    }
+    .uid-display {
+      padding: 12px 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      color: rgba(255,255,255,0.5);
+      font-size: 12px;
+      font-family: monospace;
+      word-break: break-all;
+    }
+    .submit-btn {
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #06c755, #00a8cc);
+      border: none;
+      border-radius: 14px;
+      color: #fff;
+      font-size: 17px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: all 0.2s;
+      letter-spacing: 0.5px;
+      box-shadow: 0 6px 20px rgba(6,199,85,0.3);
+    }
+    .submit-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .submit-btn:active { transform: translateY(0); }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .status {
+      text-align: center;
+      margin-top: 20px;
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      display: none;
+    }
+    .status.success { background: rgba(6,199,85,0.15); color: #06c755; border: 1px solid rgba(6,199,85,0.3); }
+    .status.error { background: rgba(255,80,80,0.15); color: #ff5050; border: 1px solid rgba(255,80,80,0.3); }
+    .loading { text-align:center; color:rgba(255,255,255,0.5); font-size:14px; padding: 20px 0; }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-icon">📖</div>
+    <h1>スタッフ登録</h1>
+    <div class="store-badge" id="storeBadge">読み込み中...</div>
+  </div>
+
+  <div id="loadingMsg" class="loading">…認証中</div>
+
+  <form id="regForm" style="display:none">
+    <div class="form-group">
+      <label>氏名 （漢字）</label>
+      <input type="text" id="name" placeholder="例：山田 太郎" required>
+    </div>
+    <div class="form-group">
+      <label>フリガナ</label>
+      <input type="text" id="furigana" placeholder="例：ヤマダ タロウ" required>
+    </div>
+    <div class="form-group">
+      <label>LINE ID（自動取得）</label>
+      <div class="uid-display" id="uidDisplay">認証中...</div>
+    </div>
+    <button type="submit" class="submit-btn" id="submitBtn">📝 登録する</button>
+  </form>
+
+  <div id="statusMsg" class="status"></div>
+</div>
+
+<script>
+  // === 設定 === (後でn8n URLに差し替え)
+  const WEBHOOK_URL = 'REPLACE_WITH_N8N_WEBHOOK_URL';
+  const LIFF_ID = 'REPLACE_WITH_LIFF_ID';
+
+  const storeMap = {
+    sezaki: 'ファミリーマート 草加瀬崎二丁目店',
+    kushihiki: 'ファミリーマート さいたま掘引町二丁目店'
+  };
+
+  const params = new URLSearchParams(window.location.search);
+  const store = params.get('store') || 'sezaki';
+  const storeName = storeMap[store] || store;
+
+  document.getElementById('storeBadge').textContent = storeName;
+
+  let lineProfile = null;
+
+  liff.init({ liffId: LIFF_ID })
+    .then(async () => {
+      if (!liff.isLoggedIn()) {
+        liff.login({ redirectUri: window.location.href });
+        return;
+      }
+      lineProfile = await liff.getProfile();
+      document.getElementById('uidDisplay').textContent = lineProfile.userId;
+      document.getElementById('loadingMsg').style.display = 'none';
+      document.getElementById('regForm').style.display = 'block';
+    })
+    .catch(err => {
+      document.getElementById('loadingMsg').textContent = '認証エラー: ' + err.message;
+    });
+
+  document.getElementById('regForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    const status = document.getElementById('statusMsg');
+    btn.disabled = true;
+    btn.textContent = '送信中...';
+
+    const payload = {
+      uid: lineProfile.userId,
+      display_name: lineProfile.displayName,
+      name: document.getElementById('name').value.trim(),
+      furigana: document.getElementById('furigana').value.trim(),
+      store: store,
+      store_name: storeName,
+      registered_at: new Date().toISOString()
+    };
+
+    try {
+      const res = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+
+      status.className = 'status success';
+      status.textContent = '✅ 登録が完了しました！';
+      status.style.display = 'block';
+      document.getElementById('regForm').style.display = 'none';
+
+      setTimeout(() => liff.closeWindow(), 2000);
+    } catch(err) {
+      status.className = 'status error';
+      status.textContent = '⚠️ 送信エラー。はじめからお試しください。';
+      status.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = '📝 登録する';
+    }
+  });
+</script>
+</body>
+</html>
