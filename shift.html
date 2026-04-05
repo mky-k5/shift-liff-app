@@ -111,7 +111,7 @@
 
     <label>希望テキスト / Shift Request</label>
     <textarea id="shiftText"
-      placeholder="例: 来週月木土は16時からのOKです。日曜日は終日入れます。水曜は学校があるのでNGOです。" required maxlength="500"></textarea>
+      placeholder="例: 来週月木土は16時からOKです。日曜日は終日入れます。水曜は学校があるのでNGです。" required maxlength="500"></textarea>
     <div class="char-count"><span id="charCount">0</span> / 500</div>
 
     <button class="submit-btn" id="submitBtn" onclick="submitForm()">📤 送信する / Submit</button>
@@ -122,7 +122,7 @@
 
 <script>
   const WEBHOOK_URL = 'https://n8n.mky-szk.com/webhook/shift-request';
-  const LIFF_ID = 'REPLACE_WITH_SHIFT_LIFF_ID';
+  const LIFF_ID = '2009694930-8BjZ3Nk8';
 
   const storeMap = {
     sezaki: 'ファミリーマート草加瀬崎二丁目店',
@@ -134,7 +134,6 @@
   const storeName = storeMap[store] || store;
   document.getElementById('storeBadge').textContent = storeName;
 
-  // Character counter
   document.getElementById('shiftText').addEventListener('input', function() {
     document.getElementById('charCount').textContent = this.value.length;
   });
