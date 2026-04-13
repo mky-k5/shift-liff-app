@@ -157,6 +157,9 @@
     const text = document.getElementById('shiftText').value.trim();
     if (!text) { alert('希望テキストを入力してください / Please enter your shift request.'); return; }
 
+    const confirmed = window.confirm(`以下の内容でシフト希望を送信します。よろしいですか？\n\n${text}`);
+    if (!confirmed) return;
+
     const btn = document.getElementById('submitBtn');
     const status = document.getElementById('statusMsg');
     btn.disabled = true;
