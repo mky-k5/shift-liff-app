@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Shift Request | シフト希望提出</title>
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -155,10 +156,28 @@
 
   async function submitForm() {
     const text = document.getElementById('shiftText').value.trim();
-    if (!text) { alert('希望テキストを入力してください / Please enter your shift request.'); return; }
+    if (!text) {
+      Swal.fire({
+        icon: 'warning',
+        title: '入力エラー',
+        text: '希望テキストを入力してください / Please enter your shift request.',
+        confirmButtonColor: '#8e44ad'
+      });
+      return; 
+    }
 
-    const confirmed = window.confirm(`以下の内容でシフト希望を送信します。よろしいですか？\n\n${text}`);
-    if (!confirmed) return;
+    const { isConfirmed } = await Swal.fire({
+      title: '送信確認',
+      text: `以下の内容でシフト希望を送信します。よろしいですか？\n\n${text}`,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#3498db',
+      cancelButtonColor: '#576574',
+      confirmButtonText: 'はい、送信します',
+      cancelButtonText: 'キャンセル'
+    });
+
+    if (!isConfirmed) return;
 
     const btn = document.getElementById('submitBtn');
     const status = document.getElementById('statusMsg');
