@@ -168,9 +168,11 @@
 
     const { isConfirmed } = await Swal.fire({
       title: '送信確認',
-      text: `以下の内容でシフト希望を送信します。よろしいですか？\n\n${text}`,
+      html: `以下の内容でシフト希望を送信します。よろしいですか？<br><br><div style="background:rgba(255,255,255,0.1); padding:12px; border-radius:8px; text-align:left; font-size:15px; border-left: 4px solid #8e44ad; color: #fff;">${text.replace(/\n/g, '<br>')}</div>`,
       icon: 'question',
       showCancelButton: true,
+      background: '#1e272e',
+      color: '#fff',
       confirmButtonColor: '#3498db',
       cancelButtonColor: '#576574',
       confirmButtonText: 'はい、送信します',
