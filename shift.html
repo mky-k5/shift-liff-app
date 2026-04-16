@@ -96,21 +96,19 @@
     <div class="logo-icon">📅</div>
     <h1>シフト希望提出</h1>
     <p class="subtitle">Shift Request</p>
-    <div class="store-badge" id="storeBadge">読み込み中...</div>
+    
   </div>
 
   <div id="loadingMsg" class="loading">…認証中 / Authenticating</div>
 
   <div id="mainForm" style="display:none">
     <div class="hint-box">
-      <div class="hint-title">💡 自由に記入してください / Write freely</div>
-      <p>「来週は火木土に出勤できます」
-「4/20は所用で休みたい」
-「every Monday 9am-5pm OK」
-— 何語・どんな形式でもOK！<br><br>
+      <div class="hint-title">💡 店舗名を必ず記載してください</div>
+      <p>「来週火曜は瀬崎に、木曜は櫛引に入れます」
+「月曜と水曜はどちらでも大丈夫です」
+「書いていない日はどちらでも可として登録されます」<br><br>
 <strong style="color: #fff;">⚠️ 変更がなければ提出不要です</strong><br>
-固定シフトの方・先週と同じ希望の方は何も送らなくてOKです。変更や例外がある場合のみ送信してください。</p>
-    </div>
+固定シフトの方・先週と同じ希望の方は何も送らなくてOKです。変更や例外がある場合のみ送信してください。</p></div>
 
     <label>希望テキスト / Shift Request</label>
     <textarea id="shiftText"
@@ -127,15 +125,9 @@
   const WEBHOOK_URL = 'https://n8n.mky-szk.com/webhook/shift-request';
   const LIFF_ID = '2009694930-8BjZ3Nk8';
 
-  const storeMap = {
-    sezaki: 'ファミリーマート草加瀬崎二丁目店',
-    kushibiki: 'ファミリーマートさいたま櫛引町二丁目店'
-  };
+  
 
-  const params = new URLSearchParams(window.location.search);
-  const store = params.get('store') || 'sezaki';
-  const storeName = storeMap[store] || store;
-  document.getElementById('storeBadge').textContent = storeName;
+  
 
   document.getElementById('shiftText').addEventListener('input', function() {
     document.getElementById('charCount').textContent = this.value.length;
@@ -189,9 +181,7 @@
     const payload = {
       uid: lineProfile.userId,
       display_name: lineProfile.displayName,
-      store: store,
-      store_name: storeName,
-      shift_text: text,
+            shift_text: text,
       submitted_at: new Date().toISOString()
     };
 
