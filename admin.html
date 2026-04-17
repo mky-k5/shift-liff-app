@@ -324,10 +324,12 @@
   const LIFF_ID = '2009694930-8BjZ3Nk8'; // Temporarily using existing LIFF ID
   const ADMIN_UIDS = []; // Empty array means ANY user can access (for testing logic).
   
-  // Endpoints (to be replaced with actual n8n webhooks)
-  const WEBHOOK_FETCH_SHIFTS = 'https://n8n.mky-szk.com/webhook/admin-fetch-shifts';
-  const WEBHOOK_CONFIRM_SHIFTS = 'https://n8n.mky-szk.com/webhook/admin-confirm-shifts';
-  const WEBHOOK_UPDATE_ROSTER = 'https://n8n.mky-szk.com/webhook/admin-update-roster';
+  // Endpoints
+  const WEBHOOK_BASE = 'https://n8n.mky-szk.com/webhook';
+  const WEBHOOK_FETCH_SHIFTS  = WEBHOOK_BASE + '/admin-fetch-shifts';
+  const WEBHOOK_FETCH_ROSTER  = WEBHOOK_BASE + '/admin-fetch-roster';
+  const WEBHOOK_CONFIRM_SHIFTS = WEBHOOK_BASE + '/admin-confirm-shifts';
+  const WEBHOOK_UPDATE_ROSTER  = WEBHOOK_BASE + '/admin-update-roster';
 
   // State
   let shiftData = [];
