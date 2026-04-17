@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard | シフト管理</title>
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #0b0f19;
+      --card-bg: rgba(255, 255, 255, 0.03);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --primary: #00d2ff;
+      --secondary: #3a7bd5;
+      --accent: #00f2fe;
+      --text-main: #f8f9fa;
+      --text-muted: #a0aabf;
+      --danger: #ff4757;
+      --success: #2ed573;
+      --warning: #ffa502;
+    }
+    
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    
+    body {
+      font-family: 'Outfit', 'Noto Sans JP', sans-serif;
+      background: var(--bg-color);
+      background-image: 
+        radial-gradient(circle at 15% 50%, rgba(58, 123, 213, 0.15) 0%, transparent 50%),
+        radial-gradient(circle at 85% 30%, rgba(0, 210, 255, 0.15) 0%, transparent 50%);
+      color: var(--text-main);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.4); }
+
+    .glass-panel {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+    }
+
+    /* Auth Layer */
+    .auth-layer {
+      position: fixed; inset: 0; z-index: 1000;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: var(--bg-color);
+    }
+    .loader-ring {
+      width: 60px; height: 60px; border-radius: 50%;
+      border: 4px solid rgba(255,255,255,0.1);
+      border-top-color: var(--primary);
+      animation: spin 1s linear infinite; margin-bottom: 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Layout */
+    .app-container {
+      display: flex; height: 100vh;
+      opacity: 0; transition: opacity 0.6s ease;
+    }
+    
+    .sidebar {
+      width: 260px; padding: 30px 20px;
+      display: flex; flex-direction: column; gap: 20px;
+      border-right: 1px solid var(--card-border);
+      background: rgba(11, 15, 25, 0.8);
+      backdrop-filter: blur(20px);
+      z-index: 10;
+    }
+    @media (max-width: 768px) {
+      .app-container { flex-direction: column; }
+      .sidebar { width: 100%; height: auto; padding: 20px; border-right: none; border-bottom: 1px solid var(--card-border); flex-direction: row; justify-content: space-between; align-items: center; }
+      .sidebar .nav-links { display: flex; gap: 10px; }
+      .sidebar .user-profile { display: none; }
+    }
+
+    .brand {
+      display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 22px;
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .brand-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      display: flex; align-items: center; justify-content: center; color: white;
+      font-size: 18px; -webkit-text-fill-color: white;
+    }
+
+    .nav-btn {
+      padding: 12px 16px; border-radius: 12px;
+      background: transparent; color: var(--text-muted);
+      border: 1px solid transparent; text-align: left;
+      font-family: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; gap: 12px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .nav-btn:hover { background: rgba(255,255,255,0.05); color: var(--text-main); }
+    .nav-btn.active {
+      background: linear-gradient(90deg, rgba(58, 123, 213, 0.2), transparent);
+      border-left: 3px solid var(--primary);
+      color: var(--primary);
+    }
+
+    .user-profile {
+      margin-top: auto; padding-top: 20px; border-top: 1px solid var(--card-border);
+      display: flex; align-items: center; gap: 12px; font-size: 14px;
+    }
+    .user-avatar { width: 40px; height: 40px; border-radius: 50%; object-fit: cover; background: #2c3e50; }
+
+    .main-content {
+      flex: 1; overflow-y: auto; padding: 40px; position: relative;
+    }
+    @media (max-width: 768px) { .main-content { padding: 20px; } }
+
+    /* Sections */
+    .section-header { margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+    .section-title { font-size: 28px; font-weight: 700; }
+    .section-desc { color: var(--text-muted); font-size: 15px; margin-top: 4px; }
+
+    /* Cards & Controls */
+    .control-bar { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    
+    .select-styled {
+      background: rgba(0,0,0,0.3); border: 1px solid var(--card-border);
+      color: var(--text-main); padding: 10px 16px; border-radius: 10px;
+      font-family: inherit; font-size: 15px; outline: none; cursor: pointer; transition: 0.2s;
+    }
+    .select-styled:focus { border-color: var(--primary); }
+
+    .btn {
+      padding: 10px 20px; border-radius: 10px; font-family: inherit; font-size: 15px; font-weight: 600;
+      border: none; cursor: pointer; transition: all 0.2s;
+      display: inline-flex; align-items: center; gap: 8px;
+    }
+    .btn-primary { background: linear-gradient(135deg, var(--secondary), var(--primary)); color: white; box-shadow: 0 4px 15px rgba(0, 210, 255, 0.3); }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0, 210, 255, 0.4); }
+    .btn-primary:active { transform: translateY(0); }
+    
+    .btn-success { background: linear-gradient(135deg, #20bf55, #01baef); color: white; box-shadow: 0 4px 15px rgba(32, 191, 85, 0.3); }
+    .btn-success:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(32, 191, 85, 0.4); }
+
+    /* Table Styles */
+    .table-container { width: 100%; overflow-x: auto; border-radius: 16px; border: 1px solid var(--card-border); background: var(--card-bg); }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th, td { padding: 16px 20px; border-bottom: 1px solid var(--card-border); white-space: nowrap; }
+    th { background: rgba(0,0,0,0.2); color: var(--text-muted); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+    tbody tr { transition: background 0.2s; }
+    tbody tr:hover { background: rgba(255,255,255,0.03); }
+    
+    .badge { padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; }
+    .badge-pending { background: rgba(255, 165, 2, 0.15); color: var(--warning); border: 1px solid rgba(255, 165, 2, 0.3); }
+    .badge-approved { background: rgba(46, 213, 115, 0.15); color: var(--success); border: 1px solid rgba(46, 213, 115, 0.3); }
+
+    /* Roster Form Grid */
+    .roster-grid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+    .roster-card { padding: 24px; border-radius: 16px; border: 1px solid var(--card-border); background: var(--card-bg); }
+    .roster-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; border-bottom: 1px solid var(--card-border); padding-bottom: 12px; }
+    .roster-name { font-size: 18px; font-weight: 600; }
+    .roster-store { font-size: 12px; padding: 3px 8px; border-radius: 6px; background: rgba(255,255,255,0.1); }
+    .day-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .day-label { font-size: 14px; width: 40px; color: var(--text-muted); }
+    .time-inputs { display: flex; gap: 8px; align-items: center; }
+    .time-input { 
+      background: rgba(0,0,0,0.3); border: 1px solid var(--card-border); border-radius: 8px; 
+      padding: 6px 10px; color: white; font-family: inherit; width: 80px; text-align: center;
+      transition: border-color 0.2s; outline: none; font-size: 14px;
+    }
+    .time-input:focus { border-color: var(--primary); }
+
+    .tab-pane { display: none; animation: fadeIn 0.4s ease forwards; }
+    .tab-pane.active { display: block; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+  </style>
+</head>
+<body>
+
+  <!-- Auth Layer -->
+  <div class="auth-layer" id="authLayer">
+    <div class="loader-ring"></div>
+    <h2 style="font-weight: 500; letter-spacing: 2px;">Authenticating...</h2>
+    <p id="authMsg" style="margin-top: 10px; color: var(--text-muted);"></p>
+  </div>
+
+  <!-- App Layout -->
+  <div class="app-container" id="appContainer">
+    <aside class="sidebar">
+      <div>
+        <div class="brand">
+          <div class="brand-icon">⌘</div>
+          Antigravity
+        </div>
+        <p style="color: var(--text-muted); font-size: 12px; margin-top: 4px; margin-left: 48px;">Shift Management</p>
+      </div>
+
+      <div class="nav-links">
+        <button class="nav-btn active" onclick="switchTab('tabShift', this)">
+          📊 シフト確定
+        </button>
+        <button class="nav-btn" onclick="switchTab('tabRoster', this)">
+          ⚙️ 固定シフト管理
+        </button>
+      </div>
+
+      <div class="user-profile">
+        <img src="https://via.placeholder.com/40" alt="avatar" class="user-avatar" id="navAvatar">
+        <div>
+          <div style="font-weight: 600;" id="navUserName">管理者</div>
+          <div style="font-size: 11px; color: var(--text-muted);">Admin Access</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      
+      <!-- Tab: Shift Confirm -->
+      <section id="tabShift" class="tab-pane active">
+        <div class="section-header">
+          <div>
+            <h1 class="section-title">シフト確定</h1>
+            <p class="section-desc">提出されたシフト希望の店舗をアサインし、全員へ確定通知を送信します。</p>
+          </div>
+          <button class="btn btn-success" onclick="confirmAllShifts()">
+            <span style="font-size:18px">🚀</span> 一括確定＆LINE通知
+          </button>
+        </div>
+
+        <div class="control-bar">
+          <select class="select-styled" id="monthSelect">
+            <option value="2026-04" selected>2026年 4月</option>
+            <option value="2026-05">2026年 5月</option>
+          </select>
+          <select class="select-styled" id="filterStatus">
+            <option value="all">すべて表示</option>
+            <option value="pending" selected>未確定（どちらでも可/希望中）</option>
+            <option value="approved">確定済み</option>
+          </select>
+          <button class="btn btn-primary" onclick="loadShiftData()">🔄 データ更新</button>
+        </div>
+
+        <div class="table-container">
+          <table id="shiftTable">
+            <thead>
+              <tr>
+                <th>対象日</th>
+                <th>スタッフ</th>
+                <th>希望時間</th>
+                <th>希望内容</th>
+                <th>ステータス</th>
+                <th>店舗確定・操作</th>
+              </tr>
+            </thead>
+            <tbody id="shiftTableBody">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+          <div id="shiftEmpty" style="display:none; padding: 40px; text-align: center; color: var(--text-muted);">
+            指定条件のデータがありません
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab: Roster / Fixed Shifts -->
+      <section id="tabRoster" class="tab-pane">
+        <div class="section-header">
+          <div>
+            <h1 class="section-title">固定シフト管理</h1>
+            <p class="section-desc">名簿データベースの「固定シフト」列（日〜土）を設定・更新します。</p>
+          </div>
+          <button class="btn btn-primary" onclick="saveAllRosters()">
+            💾 全ての変更を保存
+          </button>
+        </div>
+        
+        <div class="control-bar">
+          <button class="btn btn-primary" onclick="loadRosterData()" style="background: rgba(255,255,255,0.1); box-shadow: none;">🔄 名簿再読込</button>
+        </div>
+
+        <div class="roster-grid" id="rosterGrid">
+          <!-- Rendered via JS -->
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+<script>
+  // ==========================================
+  // CONFIG & CONSTANTS
+  // ==========================================
+  const LIFF_ID = '2009694930-8BjZ3Nk8'; // Temporarily using existing LIFF ID
+  const ADMIN_UIDS = []; // Empty array means ANY user can access (for testing logic).
+  
+  // Endpoints (to be replaced with actual n8n webhooks)
+  const WEBHOOK_FETCH_SHIFTS = 'https://n8n.mky-szk.com/webhook/admin-fetch-shifts';
+  const WEBHOOK_CONFIRM_SHIFTS = 'https://n8n.mky-szk.com/webhook/admin-confirm-shifts';
+  const WEBHOOK_UPDATE_ROSTER = 'https://n8n.mky-szk.com/webhook/admin-update-roster';
+
+  // State
+  let shiftData = [];
+  let rosterData = [];
+  let currentUser = null;
+
+  // ==========================================
+  // INITIALIZATION & AUTHENTICATION
+  // ==========================================
+  document.addEventListener('DOMContentLoaded', async () => {
+    // Check if debug mode
+    const isDebug = new URLSearchParams(window.location.search).get('debug') === '1';
+    
+    if (isDebug) {
+      document.getElementById('authMsg').textContent = 'Debug Mode Active';
+      currentUser = { userId: 'DEBUG_USER', displayName: 'Developer (Debug)', pictureUrl: 'https://via.placeholder.com/40' };
+      initializeApp();
+      return;
+    }
+
+    try {
+      await liff.init({ liffId: LIFF_ID });
+      if (!liff.isLoggedIn()) {
+        liff.login({ redirectUri: window.location.href });
+        return;
+      }
+      currentUser = await liff.getProfile();
+      
+      // Admin Check
+      if (ADMIN_UIDS.length > 0 && !ADMIN_UIDS.includes(currentUser.userId)) {
+        document.getElementById('authLayer').innerHTML = `
+          <div style="text-align:center; color: var(--danger);">
+            <div style="font-size:48px; margin-bottom:16px;">🛑</div>
+            <h2>Access Denied</h2>
+            <p style="margin-top:8px; color:var(--text-muted);">この画面へアクセスする権限がありません。</p>
+          </div>
+        `;
+        return;
+      }
+
+      initializeApp();
+    } catch (err) {
+      document.getElementById('authMsg').textContent = 'LIFF Initialization Failed: ' + err.message;
+    }
+  });
+
+  function initializeApp() {
+    if(currentUser.pictureUrl) {
+      document.getElementById('navAvatar').src = currentUser.pictureUrl;
+    }
+    document.getElementById('navUserName').textContent = currentUser.displayName;
+
+    document.getElementById('authLayer').style.display = 'none';
+    document.getElementById('appContainer').style.display = 'flex';
+    setTimeout(() => {
+      document.getElementById('appContainer').style.opacity = '1';
+      loadShiftData();
+      loadRosterData();
+    }, 50);
+
+    document.getElementById('filterStatus').addEventListener('change', renderShiftTable);
+    document.getElementById('monthSelect').addEventListener('change', renderShiftTable);
+  }
+
+  // ==========================================
+  // UI LOGIC
+  // ==========================================
+  function switchTab(tabId, btnElem) {
+    document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    btnElem.classList.add('active');
+  }
+
+  // ==========================================
+  // TAB 1: SHIFT CONFIRM
+  // ==========================================
+  async function loadShiftData() {
+    const tbody = document.getElementById('shiftTableBody');
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Loading data...</td></tr>`;
+
+    try {
+      // Dummy Fetch
+      await new Promise(r => setTimeout(r, 600)); 
+      
+      const currentMonth = "2026-04";
+      shiftData = [
+        { id: 'S01', date: currentMonth + '-25', name: '山田太郎', time: '09:00 - 17:00', storeReq: 'どちらでも可', status: '希望中', assignedStore: '' },
+        { id: 'S02', date: currentMonth + '-25', name: '佐藤花子', time: '12:00 - 20:00', storeReq: '瀬崎', status: '希望中', assignedStore: '瀬崎' },
+        { id: 'S03', date: currentMonth + '-27', name: '高橋次郎', time: '08:00 - 13:00', storeReq: '櫛引', status: '有効', assignedStore: '櫛引' },
+        { id: 'S04', date: currentMonth + '-27', name: '山田太郎', time: '17:00 - 22:00', storeReq: 'どちらでも可', status: '希望中', assignedStore: '' },
+        { id: 'S05', date: '2026-05' + '-01', name: '鈴木一郎', time: '10:00 - 15:00', storeReq: '瀬崎', status: '希望中', assignedStore: '瀬崎' },
+      ];
+      renderShiftTable();
+    } catch(err) {
+      Swal.fire({ icon: 'error', title: '読み込みエラー', text: err.message, background: '#1e272e', color: '#fff' });
+    }
+  }
+
+  function renderShiftTable() {
+    const filter = document.getElementById('filterStatus').value;
+    const month = document.getElementById('monthSelect').value;
+    const tbody = document.getElementById('shiftTableBody');
+    const emptyMsg = document.getElementById('shiftEmpty');
+    
+    tbody.innerHTML = '';
+    
+    const filtered = shiftData.filter(d => {
+      if(!d.date.startsWith(month)) return false;
+      if(filter === 'pending') return d.status === '希望中';
+      if(filter === 'approved') return d.status === '有効';
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      emptyMsg.style.display = 'block';
+      return;
+    }
+    emptyMsg.style.display = 'none';
+
+    filtered.forEach(d => {
+      const isPending = d.status === '希望中';
+      const badgeCls = isPending ? 'badge-pending' : 'badge-approved';
+      
+      const selectHtml = `
+        <select class="select-styled" onchange="updateRowStore('${d.id}', this.value)" style="width: 120px;" ${!isPending ? 'disabled' : ''}>
+          <option value="" ${d.assignedStore==='' ? 'selected' : ''}>-- 未確定 --</option>
+          <option value="瀬崎" ${d.assignedStore==='瀬崎' ? 'selected' : ''}>瀬崎</option>
+          <option value="櫛引" ${d.assignedStore==='櫛引' ? 'selected' : ''}>櫛引</option>
+        </select>
+      `;
+
+      const actionHtml = isPending 
+        ? `<button class="btn" style="background:rgba(255,255,255,0.1); padding: 8px 12px; margin-left: 8px; font-size:13px;" onclick="saveSingleShift('${d.id}')">保存</button>`
+        : `<span style="color:var(--success); margin-left: 8px; font-size:12px; font-weight:600;">確定済</span>`;
+
+      const storeColor = (d.storeReq === 'どちらでも可' || d.storeReq.includes('、')) ? 'color: var(--warning); font-weight:600;' : '';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-family: monospace;">${d.date}</td>
+        <td style="font-weight:600;">${d.name}</td>
+        <td>${d.time}</td>
+        <td><span style="${storeColor}">${d.storeReq}</span></td>
+        <td><span class="badge ${badgeCls}">${d.status}</span></td>
+        <td>${selectHtml} ${actionHtml}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function updateRowStore(id, val) {
+    const row = shiftData.find(x => x.id === id);
+    if(row) row.assignedStore = val;
+  }
+
+  async function saveSingleShift(id) {
+    const row = shiftData.find(x => x.id === id);
+    if(!row.assignedStore) {
+      Swal.fire({ icon: 'warning', title: '店舗未確定', text: '「どちらでも可」等の場合、店舗を確定(選択)してから保存してください。', background: '#1e272e', color: '#fff'});
+      return;
+    }
+    
+    // Simulate Fetch save
+    row.status = '有効';
+    renderShiftTable();
+    Swal.fire({ icon: 'success', title: '保存しました', toast: true, position: 'top-end', showConfirmButton: false, timer: 2000, background: '#1e272e', color: '#fff'});
+  }
+
+  async function confirmAllShifts() {
+    const unassigned = shiftData.find(d => d.status === '希望中' && !d.assignedStore);
+    if(unassigned) {
+      Swal.fire({ icon: 'warning', title: '未割当あり', text: '店舗が割り当てられていない希望が存在します。すべてを確定してから送信してください。', background: '#1e272e', color: '#fff' });
+      return;
+    }
+
+    const { isConfirmed } = await Swal.fire({
+      title: '確定＆通知送信',
+      text: '現在表示されている希望を全て確定し、スタッフへ確定通知をLINEでプッシュしますか？',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: '送信する',
+      confirmButtonColor: '#2ed573',
+      background: '#1e272e', color: '#fff'
+    });
+
+    if(isConfirmed) {
+      Swal.fire({
+        title: '送信中...', allowOutsideClick: false, showConfirmButton: false, 
+        didOpen: () => { Swal.showLoading(); }, background: '#1e272e', color: '#fff' 
+      });
+
+      // Dummy delay
+      await new Promise(r => setTimeout(r, 1200));
+
+      shiftData.forEach(d => { if(d.status === '希望中') d.status = '有効'; });
+      renderShiftTable();
+
+      Swal.fire({ title: '送信完了', text: '全員への確定通知がスケジュールされました。', icon: 'success', background: '#1e272e', color: '#fff' });
+    }
+  }
+
+  // ==========================================
+  // TAB 2: ROSTER FIXED SHIFTS
+  // ==========================================
+  const DAYS = ['日', '月', '火', '水', '木', '金', '土'];
+
+  async function loadRosterData() {
+    const grid = document.getElementById('rosterGrid');
+    grid.innerHTML = `<div style="padding: 20px;">読込中...</div>`;
+
+    try {
+      await new Promise(r => setTimeout(r, 500));
+      rosterData = [
+        { uid: 'u1', name: '山田太郎', store: '瀬崎', fixed: { '日':['',''], '月':['09:00','17:00'], '火':['',''], '水':['09:00','17:00'], '木':['',''], '金':['',''], '土':['',''] } },
+        { uid: 'u2', name: '佐藤花子', store: '櫛引', fixed: { '日':['',''], '月':['',''], '火':['17:00','22:00'], '水':['',''], '木':['17:00','22:00'], '金':['',''], '土':['08:00','15:00'] } },
+        { uid: 'u3', name: '高橋次郎', store: '瀬崎、櫛引', fixed: { '日':['',''], '月':['',''], '火':['',''], '水':['',''], '木':['',''], '金':['',''], '土':['',''] } }
+      ];
+      renderRosterGrid();
+    } catch(err) {
+      Swal.fire({ icon: 'error', title: '名簿読込エラー', text: err.message, background: '#1e272e', color: '#fff' });
+    }
+  }
+
+  function renderRosterGrid() {
+    const grid = document.getElementById('rosterGrid');
+    grid.innerHTML = '';
+
+    rosterData.forEach(user => {
+      const card = document.createElement('div');
+      card.className = 'roster-card';
+      let formHtml = '';
+      
+      DAYS.forEach(day => {
+        const start = user.fixed[day][0];
+        const end = user.fixed[day][1];
+        formHtml += `
+          <div class="day-row">
+            <span class="day-label">${day}</span>
+            <div class="time-inputs">
+              <input type="time" class="time-input" value="${start}" onchange="updateRosterTime('${user.uid}', '${day}', 0, this.value)">
+              <span style="color:var(--text-muted)">-</span>
+              <input type="time" class="time-input" value="${end}" onchange="updateRosterTime('${user.uid}', '${day}', 1, this.value)">
+            </div>
+          </div>
+        `;
+      });
+
+      card.innerHTML = `
+        <div class="roster-header">
+          <div class="roster-name">${user.name}</div>
+          <div class="roster-store">${user.store}</div>
+        </div>
+        <div>${formHtml}</div>
+      `;
+      grid.appendChild(card);
+    });
+  }
+
+  function updateRosterTime(uid, day, idx, val) {
+    const user = rosterData.find(x => x.uid === uid);
+    if(user) user.fixed[day][idx] = val;
+  }
+
+  async function saveAllRosters() {
+    Swal.fire({ title: '保存中...', allowOutsideClick: false, showConfirmButton: false, didOpen:()=>{Swal.showLoading();}, background: '#1e272e', color: '#fff' });
+    
+    try {
+      await new Promise(r => setTimeout(r, 1200)); 
+      Swal.fire({ icon: 'success', title: '保存完了', text: 'スプレッドシート（名簿の対象14列）が更新されました。', background: '#1e272e', color: '#fff' });
+    } catch(err) {
+      Swal.fire({ icon: 'error', title: '保存失敗', text: err.message, background: '#1e272e', color: '#fff' });
+    }
+  }
+
+</script>
+</body>
+</html>
