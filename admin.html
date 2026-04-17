@@ -410,16 +410,9 @@
     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Loading data...</td></tr>`;
 
     try {
-      await new Promise(r => setTimeout(r, 600)); 
-      
-      const currentMonth = "2026-04";
-      shiftData = [
-        { id: 'S01', date: currentMonth + '-25', name: '山田太郎', time: '09:00 - 17:00', storeReq: 'どちらでも可', status: '希望中', assignedStore: '' },
-        { id: 'S02', date: currentMonth + '-25', name: '佐藤花子', time: '12:00 - 20:00', storeReq: '瀬崎', status: '希望中', assignedStore: '瀬崎' },
-        { id: 'S03', date: currentMonth + '-27', name: '高橋次郎', time: '08:00 - 13:00', storeReq: '櫛引', status: '有効', assignedStore: '櫛引' },
-        { id: 'S04', date: currentMonth + '-27', name: '山田太郎', time: '17:00 - 22:00', storeReq: 'どちらでも可', status: '希望中', assignedStore: '' },
-        { id: 'S05', date: '2026-05' + '-01', name: '鈴木一郎', time: '10:00 - 15:00', storeReq: '瀬崎', status: '希望中', assignedStore: '瀬崎' },
-      ];
+      const res = await fetch(WEBHOOK_FETCH_SHIFTS);
+      if(!res.ok) throw new Error("HTTP Status: " + res.status);
+      shiftData = await res.json();
       renderShiftTable();
     } catch(err) {
       Swal.fire({ icon: 'error', title: '読み込みエラー', text: err.message, background: '#1e272e', color: '#fff' });
@@ -519,9 +512,13 @@
         didOpen: () => { Swal.showLoading(); }, background: '#1e272e', color: '#fff' 
       });
 
-      // Dummy delay
-      await new Promise(r => setTimeout(r, 1200));
-
+      // Simulate Fetch save
+      const confirmed = shiftData.filter(d => d.status === '希望中');
+      await fetch(WEBHOOK_CONFIRM_SHIFTS, {
+         method: 'POST',
+         headers: {'Content-Type': 'application/json'},
+         body: JSON.stringify(confirmed)
+      });
       shiftData.forEach(d => { if(d.status === '希望中') d.status = '有効'; });
       renderShiftTable();
 
@@ -536,16 +533,12 @@
 
   async function loadRosterData() {
     const grid = document.getElementById('rosterGrid');
-    grid.innerHTML = `<div style="padding: 20px;">読込中...</div>`;
+    grid.innerHTML = `<div style="padding: 20px;">読込中...（初回は数秒かかります）</div>`;
 
     try {
-      await new Promise(r => setTimeout(r, 600));
-      // Mock data matching exact spreadsheet fields: 氏名(C), 時給(D), 店舗(E), 在籍(V), 固定シフト F-S
-      rosterData = [
-        { uid: 'u1', name: '山田太郎', wage: 1100, store: '瀬崎', active: 1, fixed: { '日':['',''], '月':['09:00','17:00'], '火':['',''], '水':['09:00','17:00'], '木':['',''], '金':['',''], '土':['',''] } },
-        { uid: 'u2', name: '佐藤花子', wage: 1050, store: '櫛引', active: 1, fixed: { '日':['',''], '月':['',''], '火':['17:00','22:00'], '水':['',''], '木':['17:00','22:00'], '金':['',''], '土':['08:00','15:00'] } },
-        { uid: 'u3', name: '高橋次郎', wage: 1200, store: '瀬崎・櫛引', active: 0, fixed: { '日':['',''], '月':['',''], '火':['',''], '水':['',''], '木':['',''], '金':['',''], '土':['',''] } }
-      ];
+      const res = await fetch(WEBHOOK_FETCH_ROSTER);
+      if(!res.ok) throw new Error("HTTP Status: " + res.status);
+      rosterData = await res.json();
       renderRosterGrid();
     } catch(err) {
       Swal.fire({ icon: 'error', title: '名簿読込エラー', text: err.message, background: '#1e272e', color: '#fff' });
@@ -634,8 +627,11 @@
     Swal.fire({ title: '保存中...', allowOutsideClick: false, showConfirmButton: false, didOpen:()=>{Swal.showLoading();}, background: '#1e272e', color: '#fff' });
     
     try {
-      // payload = JSON.stringify(rosterData)
-      await new Promise(r => setTimeout(r, 1200)); 
+      await fetch(WEBHOOK_UPDATE_ROSTER, {
+         method: 'POST',
+         headers: {'Content-Type': 'application/json'},
+         body: JSON.stringify(rosterData)
+      });
       Swal.fire({ icon: 'success', title: '保存完了', text: 'スプレッドシート上の名簿・固定シフト設定を一括更新しました。', background: '#1e272e', color: '#fff' });
     } catch(err) {
       Swal.fire({ icon: 'error', title: '保存失敗', text: err.message, background: '#1e272e', color: '#fff' });
