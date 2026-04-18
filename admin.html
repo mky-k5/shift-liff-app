@@ -330,6 +330,7 @@
   const WEBHOOK_FETCH_SHIFTS = `${WEBHOOK_BASE}/app-fetch-shifts`;
   const WEBHOOK_UPDATE_ROSTER = `${WEBHOOK_BASE}/app-update-roster`;
   const WEBHOOK_CONFIRM_SHIFTS = `${WEBHOOK_BASE}/app-confirm-shifts`;
+  const WEBHOOK_RESET_USER = `${WEBHOOK_BASE}/app-reset-user`;
 
   // State
   let shiftData = [];
@@ -615,6 +616,10 @@
         <div class="separator"></div>
         <div class="info-label" style="margin-bottom:12px;">固定シフト</div>
         <div>${shiftsHtml}</div>
+        <div class="separator"></div>
+        <div style="text-align:right; margin-top:12px;">
+          <button class="btn" style="background:var(--danger); color:#fff; font-size:12px; padding:6px 12px; box-shadow:none;" onclick="resetUserData('${user.uid}', '${user.name}')">⚠️ このスタッフのデータをリセット</button>
+        </div>
       `;
       grid.appendChild(card);
     });
@@ -637,6 +642,36 @@
       Swal.fire({ icon: 'success', title: '保存完了', text: 'スプレッドシート上の名簿・固定シフト設定を一括更新しました。', background: '#1e272e', color: '#fff' });
     } catch(err) {
       Swal.fire({ icon: 'error', title: '保存失敗', text: err.message, background: '#1e272e', color: '#fff' });
+    }
+  }
+
+  async function resetUserData(uid, userName) {
+    const { isConfirmed } = await Swal.fire({
+      title: '🚨 危険な操作',
+      html: `<b>${userName}</b> さんの過去のシフト希望とマスタデータを全てリセットしますか？<br><br><span style="color:var(--danger)">※この操作は取り消せません。幻覚データのクリアなどの非常時にのみ使用してください。</span>`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'はい、リセットします',
+      confirmButtonColor: '#e84118',
+      background: '#1e272e', color: '#fff'
+    });
+
+    if (isConfirmed) {
+      Swal.fire({
+        title: 'リセット中...', allowOutsideClick: false, showConfirmButton: false,
+        didOpen: () => { Swal.showLoading(); }, background: '#1e272e', color: '#fff'
+      });
+      try {
+        const res = await fetch(WEBHOOK_RESET_USER, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ target_uid: uid })
+        });
+        if(!res.ok) throw new Error("HTTP Status: " + res.status);
+        Swal.fire({ title: 'リセット完了', text: 'データがリセットされました。', icon: 'success', background: '#1e272e', color: '#fff' });
+      } catch(err) {
+        Swal.fire({ icon: 'error', title: 'エラー', text: err.message, background: '#1e272e', color: '#fff' });
+      }
     }
   }
 
