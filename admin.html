@@ -130,7 +130,7 @@
     .section-desc { color: var(--text-muted); font-size: 15px; margin-top: 4px; }
 
     /* Cards & Controls */
-    .control-bar { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .control-bar { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; align-items: center; }
     
     .select-styled {
       background: rgba(0,0,0,0.3); border: 1px solid var(--card-border);
@@ -157,6 +157,13 @@
     
     .btn-success { background: linear-gradient(135deg, #20bf55, #01baef); color: white; box-shadow: 0 4px 15px rgba(32, 191, 85, 0.3); }
     .btn-success:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(32, 191, 85, 0.4); }
+
+    /* AI Summary Area */
+    .ai-summary { background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.2); padding: 16px; border-radius: 12px; margin-bottom: 24px; }
+    .ai-summary-title { font-size: 16px; font-weight: 600; color: var(--primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+    .shortage-item { background: rgba(255, 71, 87, 0.1); border-left: 3px solid var(--danger); padding: 8px 12px; margin-bottom: 8px; font-size: 14px; border-radius: 4px; display: flex; align-items: center; gap: 10px; }
+    .shortage-ok { background: rgba(46, 213, 115, 0.1); border-left: 3px solid var(--success); padding: 8px 12px; font-size: 14px; border-radius: 4px; color: var(--success); }
+    .ai-note { font-size: 13px; color: var(--text-muted); margin-top: 12px; font-style: italic; border-top: 1px solid var(--card-border); padding-top: 8px; line-height: 1.5; }
 
     /* Table Styles */
     .table-container { width: 100%; overflow-x: auto; border-radius: 16px; border: 1px solid var(--card-border); background: var(--card-bg); }
@@ -260,17 +267,42 @@
           </button>
         </div>
 
-        <div class="control-bar">
-          <select class="select-styled" id="monthSelect">
-            <option value="2026-04" selected>2026年 4月</option>
-            <option value="2026-05">2026年 5月</option>
-          </select>
-          <select class="select-styled" id="filterStatus">
-            <option value="all">すべて表示</option>
-            <option value="pending" selected>未確定（どちらでも可/希望中）</option>
-            <option value="approved">確定済み</option>
-          </select>
-          <button class="btn btn-primary" onclick="loadShiftData()">🔄 データ更新</button>
+        <div class="control-bar" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid var(--card-border); gap: 20px;">
+          <div style="display:flex; align-items:center; gap: 12px; flex-wrap: wrap;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <select class="select-styled" id="monthSelect" onchange="calculateShortages()">
+                <option value="2026-04" selected>2026年 4月</option>
+                <option value="2026-05">2026年 5月</option>
+              </select>
+              <select class="select-styled" id="filterStatus">
+                <option value="all">すべて表示</option>
+                <option value="pending" selected>未確定（どちらでも可/希望中）</option>
+                <option value="approved">確定済み</option>
+              </select>
+              <button class="btn btn-primary" onclick="loadShiftData()">🔄 データ更新</button>
+            </div>
+            
+            <div style="width: 1px; height: 30px; background: var(--card-border); margin: 0 8px;"></div>
+            
+            <div style="display:flex; align-items:center; gap: 8px;">
+              <span style="font-size:13px; color:var(--text-muted);">目安人数:</span>
+              <span style="font-size:13px;">瀬崎</span>
+              <input type="number" id="reqSezaki" class="input-styled" style="width: 60px; padding: 6px;" value="2" min="0" onchange="calculateShortages()">
+              <span style="font-size:13px; margin-left:8px;">櫛引</span>
+              <input type="number" id="reqKushibiki" class="input-styled" style="width: 60px; padding: 6px;" value="2" min="0" onchange="calculateShortages()">
+            </div>
+            
+            <button class="btn" style="background: linear-gradient(135deg, #8e2de2, #4a00e0); color: white; box-shadow: 0 4px 15px rgba(142, 45, 226, 0.3);" onclick="runAiAudit()">
+              <span style="font-size:16px">✨</span> AI監査・自動割当
+            </button>
+          </div>
+        </div>
+
+        <!-- AI & Shortage Summary Area -->
+        <div id="aiSummaryArea" style="display:none;" class="ai-summary">
+          <div class="ai-summary-title">🤖 日別過不足状況 & AI監査サマリー</div>
+          <div id="shortageList"></div>
+          <div id="aiNote" class="ai-note" style="display:none;"></div>
         </div>
 
         <div class="table-container">
@@ -334,6 +366,7 @@
   const WEBHOOK_UPDATE_ROSTER = `${WEBHOOK_BASE}/app-update-roster`;
   const WEBHOOK_CONFIRM_SHIFTS = `${WEBHOOK_BASE}/app-confirm-shifts`;
   const WEBHOOK_RESET_USER = `${WEBHOOK_BASE}/app-reset-user`;
+  const WEBHOOK_AI_AUDIT = `${WEBHOOK_BASE}/app-ai-audit`;
 
   // State
   let shiftData = [];
@@ -362,7 +395,6 @@
       }
       currentUser = await liff.getProfile();
       
-      // Admin Check
       if (ADMIN_UIDS.length > 0 && !ADMIN_UIDS.includes(currentUser.userId)) {
         document.getElementById('authLayer').innerHTML = `
           <div style="text-align:center; color: var(--danger);">
@@ -395,7 +427,7 @@
     }, 50);
 
     document.getElementById('filterStatus').addEventListener('change', renderShiftTable);
-    document.getElementById('monthSelect').addEventListener('change', renderShiftTable);
+    document.getElementById('monthSelect').addEventListener('change', () => { renderShiftTable(); calculateShortages(); });
   }
 
   // ==========================================
@@ -409,7 +441,7 @@
   }
 
   // ==========================================
-  // TAB 1: SHIFT CONFIRM
+  // TAB 1: SHIFT CONFIRM & AI AUDIT
   // ==========================================
   async function loadShiftData() {
     const tbody = document.getElementById('shiftTableBody');
@@ -420,8 +452,113 @@
       if(!res.ok) throw new Error("HTTP Status: " + res.status);
       shiftData = await res.json();
       renderShiftTable();
+      calculateShortages();
+      document.getElementById('aiSummaryArea').style.display = 'block';
     } catch(err) {
       Swal.fire({ icon: 'error', title: '読み込みエラー', text: err.message, background: '#1e272e', color: '#fff' });
+    }
+  }
+
+  function calculateShortages() {
+    const filterMonth = document.getElementById('monthSelect').value;
+    const reqS = parseInt(document.getElementById('reqSezaki').value) || 0;
+    const reqK = parseInt(document.getElementById('reqKushibiki').value) || 0;
+    
+    const dailyCount = {};
+    
+    // 集計処理
+    shiftData.forEach(d => {
+      if(!d.date.startsWith(filterMonth)) return;
+      if(!dailyCount[d.date]) dailyCount[d.date] = { '瀬崎': 0, '櫛引': 0 };
+      
+      const store = d.assignedStore || (d.storeReq !== 'どちらでも可' && !d.storeReq.includes('、') && !d.storeReq.includes('・') ? d.storeReq : null);
+      if(store === '瀬崎') dailyCount[d.date]['瀬崎']++;
+      if(store === '櫛引') dailyCount[d.date]['櫛引']++;
+    });
+
+    const shortageList = document.getElementById('shortageList');
+    shortageList.innerHTML = '';
+    let hasShortage = false;
+
+    Object.keys(dailyCount).sort().forEach(date => {
+      const c = dailyCount[date];
+      const shortS = reqS - c['瀬崎'];
+      const shortK = reqK - c['櫛引'];
+      
+      if(shortS > 0 || shortK > 0) {
+        hasShortage = true;
+        let txt = `<strong style="width:100px; display:inline-block;">📅 ${date}</strong>`;
+        if(shortS > 0) txt += `<span style="color:var(--warning); font-weight:600; margin-right:12px;">瀬崎が ${shortS}名 不足 (現在${c['瀬崎']})</span>`;
+        if(shortK > 0) txt += `<span style="color:var(--warning); font-weight:600;">櫛引が ${shortK}名 不足 (現在${c['櫛引']})</span>`;
+        
+        const div = document.createElement('div');
+        div.className = 'shortage-item';
+        div.innerHTML = txt;
+        shortageList.appendChild(div);
+      }
+    });
+
+    if(!hasShortage) {
+      shortageList.innerHTML = `<div class="shortage-ok">✅ 現在の表示月において、指定された基準人数の不足はありません。ワンオペ等を意図的に許可する場合はそのまま保存できます。</div>`;
+    }
+  }
+
+  async function runAiAudit() {
+    const reqS = document.getElementById('reqSezaki').value;
+    const reqK = document.getElementById('reqKushibiki').value;
+    const filterMonth = document.getElementById('monthSelect').value;
+
+    const payload = {
+      targetMonth: filterMonth,
+      requiredSezaki: reqS,
+      requiredKushibiki: reqK,
+      shifts: shiftData,
+      roster: rosterData
+    };
+
+    Swal.fire({
+      title: 'AI監査・割当実行中...',
+      html: 'Geminiが人員配置を最適化し、不足シフトを分析しています。<br>約10〜20秒かかります...',
+      allowOutsideClick: false,
+      didOpen: () => { Swal.showLoading(); },
+      background: '#1e272e', color: '#fff'
+    });
+
+    try {
+      const res = await fetch(WEBHOOK_AI_AUDIT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if(!res.ok) throw new Error("API連携エラー: " + res.status);
+      
+      const result = await res.json();
+      
+      // result.assignments : [{ id: "...", assignedStore: "瀬崎" }]
+      if(result.assignments && Array.isArray(result.assignments)) {
+        result.assignments.forEach(a => {
+          const row = shiftData.find(x => x.id === a.id);
+          if(row && row.status === '希望中') {
+            row.assignedStore = a.assignedStore;
+          }
+        });
+      }
+
+      // Special notes from AI
+      const aiNoteEl = document.getElementById('aiNote');
+      if(result.aiNote) {
+        aiNoteEl.innerHTML = `<strong>💡 AIからの特記事項・監査レポート:</strong><br>${result.aiNote.replace(/\\n/g, '<br>')}`;
+        aiNoteEl.style.display = 'block';
+      } else {
+        aiNoteEl.style.display = 'none';
+      }
+
+      renderShiftTable();
+      calculateShortages();
+      Swal.fire({ icon: 'success', title: 'AI処理完了', text: '推奨シフト案を画面に反映し、過不足表示を更新しました。', background: '#1e272e', color: '#fff' });
+
+    } catch(err) {
+      Swal.fire({ icon: 'error', title: 'AI監査エラー', text: err.message, background: '#1e272e', color: '#fff' });
     }
   }
 
@@ -465,6 +602,9 @@
       const storeColor = (d.storeReq === 'どちらでも可' || d.storeReq.includes('、')) ? 'color: var(--warning); font-weight:600;' : '';
 
       const tr = document.createElement('tr');
+      // Highlight row if recently assigned by AI (simple visual cue)
+      if(d.assignedStore && isPending) tr.style.background = 'rgba(46, 213, 115, 0.05)';
+
       tr.innerHTML = `
         <td style="font-family: monospace;">${d.date}</td>
         <td style="font-weight:600;">${d.name}</td>
@@ -480,6 +620,7 @@
   function updateRowStore(id, val) {
     const row = shiftData.find(x => x.id === id);
     if(row) row.assignedStore = val;
+    calculateShortages();
   }
 
   async function saveSingleShift(id) {
@@ -492,6 +633,7 @@
     // Simulate Fetch save
     row.status = '有効';
     renderShiftTable();
+    calculateShortages();
     Swal.fire({ icon: 'success', title: '保存しました', toast: true, position: 'top-end', showConfirmButton: false, timer: 2000, background: '#1e272e', color: '#fff'});
   }
 
@@ -520,15 +662,19 @@
 
       // Simulate Fetch save
       const confirmed = shiftData.filter(d => d.status === '希望中');
-      await fetch(WEBHOOK_CONFIRM_SHIFTS, {
-         method: 'POST',
-         headers: {'Content-Type': 'application/json'},
-         body: JSON.stringify(confirmed)
-      });
-      shiftData.forEach(d => { if(d.status === '希望中') d.status = '有効'; });
-      renderShiftTable();
-
-      Swal.fire({ title: '送信完了', text: '全員への確定通知がスケジュールされました。', icon: 'success', background: '#1e272e', color: '#fff' });
+      try {
+        await fetch(WEBHOOK_CONFIRM_SHIFTS, {
+           method: 'POST',
+           headers: {'Content-Type': 'application/json'},
+           body: JSON.stringify(confirmed)
+        });
+        shiftData.forEach(d => { if(d.status === '希望中') d.status = '有効'; });
+        renderShiftTable();
+        calculateShortages();
+        Swal.fire({ title: '送信完了', text: '全員への確定通知がスケジュールされました。', icon: 'success', background: '#1e272e', color: '#fff' });
+      } catch (err) {
+        Swal.fire({ title: '通知エラー', text: err.message, icon: 'error', background: '#1e272e', color: '#fff' });
+      }
     }
   }
 
@@ -572,7 +718,6 @@
       const card = document.createElement('div');
       card.className = 'roster-card';
       
-      // Basic Info Form
       const isActiveChecked = user.active === 1 ? 'checked' : '';
       const basicInfoHtml = `
         <div class="roster-info-grid">
@@ -597,7 +742,6 @@
         </div>
       `;
 
-      // Fixed Shifts Form
       let shiftsHtml = '';
       DAYS.forEach(day => {
         const start = user.fixed[day][0];
