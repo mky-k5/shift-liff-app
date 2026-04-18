@@ -162,6 +162,9 @@
     .ai-summary { background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.2); padding: 24px; border-radius: 12px; margin-bottom: 24px; }
     .ai-summary-title { font-size: 16px; font-weight: 600; color: var(--primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
     
+    .shortage-item { background: rgba(255, 71, 87, 0.1); border-left: 3px solid var(--danger); padding: 8px 12px; margin-bottom: 8px; font-size: 14px; border-radius: 4px; display: flex; align-items: center; gap: 10px; }
+    .shortage-ok { background: rgba(46, 213, 115, 0.1); border-left: 3px solid var(--success); padding: 8px 12px; font-size: 14px; border-radius: 4px; color: var(--success); }
+
     /* Table Styles */
     .table-container { width: 100%; overflow-x: auto; border-radius: 16px; border: 1px solid var(--card-border); background: var(--card-bg); }
     table { width: 100%; border-collapse: collapse; text-align: left; }
@@ -267,37 +270,49 @@
         <div class="control-bar" style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 12px; border: 1px solid var(--card-border); gap: 20px;">
           <div style="display:flex; align-items:center; gap: 12px; flex-wrap: wrap; width: 100%;">
             <div style="display:flex; align-items:center; gap:8px;">
-              <select class="select-styled" id="monthSelect" onchange="renderShiftTable()">
+              <select class="select-styled" id="monthSelect" onchange="calculateShortages(); renderShiftTable();">
                 <option value="2026-04" selected>2026年 4月</option>
                 <option value="2026-05">2026年 5月</option>
               </select>
-              <select class="select-styled" id="filterStatus">
+              <select class="select-styled" id="filterStatus" onchange="renderShiftTable()">
                 <option value="all">すべて表示</option>
                 <option value="pending" selected>未確定（どちらでも可/希望中）</option>
                 <option value="approved">確定済み</option>
               </select>
               <button class="btn btn-primary" onclick="loadShiftData()">🔄 データ更新</button>
             </div>
+            
+            <div style="width: 1px; height: 30px; background: var(--card-border); margin: 0 8px;"></div>
+            
+            <div style="display:flex; align-items:center; gap: 8px;">
+              <span style="font-size:13px; color:var(--text-muted);">目安ベース:</span>
+              <span style="font-size:13px;">瀬崎</span>
+              <input type="number" id="reqSezaki" class="input-styled" style="width: 60px; padding: 6px;" value="2" min="0" onchange="calculateShortages()">
+              <span style="font-size:13px; margin-left:8px;">櫛引</span>
+              <input type="number" id="reqKushibiki" class="input-styled" style="width: 60px; padding: 6px;" value="2" min="0" onchange="calculateShortages()">
+            </div>
           </div>
           
           <div style="width: 100%; border-top: 1px dashed var(--card-border); padding-top: 16px; display: flex; flex-direction: column; gap: 12px;">
             <div style="display: flex; justify-content: space-between; align-items: flex-end;">
-              <label for="aiAuditRule" style="font-size:15px; color:var(--primary); font-weight:600;">📝 AI監査ルール（自然言語の指示書）</label>
+              <label for="aiAuditRule" style="font-size:14px; color:var(--primary); font-weight:600;">📝 AI監査時の特記事項（※数値枠と競合する場合などはAIが良しなに判断します）</label>
               <button class="btn" style="background: linear-gradient(135deg, #8e2de2, #4a00e0); color: white; box-shadow: 0 4px 15px rgba(142, 45, 226, 0.3);" onclick="runAiAudit()">
-                <span style="font-size:16px">✨</span> このルールで監査・自動割当を実行
+                <span style="font-size:16px">✨</span> オート監査・自動割当を実行
               </button>
             </div>
-            <textarea id="aiAuditRule" class="input-styled" style="height: 100px; resize: vertical; line-height: 1.5; font-family: monospace;" placeholder="例：各店基本は2名。瀬崎は6:00-9:00のみ3名必須。櫛引は17時以降3名。ワンオペは不可。">
-各店とも基本は2名体制。
-ただし瀬崎店は6:00-11:00の間は3名推奨。
-櫛引店は時間帯問わずワンオペNG（必ず2名以上にする）。</textarea>
+            <textarea id="aiAuditRule" class="input-styled" style="height: 70px; resize: vertical; line-height: 1.5; font-family: monospace;" placeholder="例：瀬崎は13-15時はワンオペ可、など">瀬崎店は6:00-11:00の間は3名推奨。13:00-15:00はワンオペ可。</textarea>
           </div>
         </div>
 
-        <!-- AI Audit Report Area -->
-        <div id="aiSummaryArea" style="display:none;" class="ai-summary">
-          <div class="ai-summary-title">🤖 AI監査の詳細レポート</div>
-          <div id="aiReportContent" style="font-size:14.5px; line-height:1.7; white-space: pre-wrap; margin-top:12px; color: #f8f9fa;"></div>
+        <!-- Notification & Summary Area -->
+        <div id="summaryAreaContainer" style="margin-bottom: 24px;">
+          <div id="shortageList" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px;"></div>
+          
+          <!-- AI Audit Report Area -->
+          <div id="aiSummaryArea" style="display:none;" class="ai-summary">
+            <div class="ai-summary-title">🤖 AI監査の詳細レポート</div>
+            <div id="aiReportContent" style="font-size:14.5px; line-height:1.7; white-space: pre-wrap; margin-top:12px; color: #f8f9fa;"></div>
+          </div>
         </div>
 
         <div class="table-container">
@@ -419,8 +434,6 @@
       loadShiftData();
       loadRosterData();
     }, 50);
-
-    document.getElementById('filterStatus').addEventListener('change', renderShiftTable);
   }
 
   // ==========================================
@@ -445,22 +458,66 @@
       if(!res.ok) throw new Error("HTTP Status: " + res.status);
       shiftData = await res.json();
       renderShiftTable();
+      calculateShortages();
     } catch(err) {
       Swal.fire({ icon: 'error', title: '読み込みエラー', text: err.message, background: '#1e272e', color: '#fff' });
+    }
+  }
+
+  function calculateShortages() {
+    const filterMonth = document.getElementById('monthSelect').value;
+    const reqS = parseInt(document.getElementById('reqSezaki').value) || 0;
+    const reqK = parseInt(document.getElementById('reqKushibiki').value) || 0;
+    
+    const dailyCount = {};
+    
+    // 集計処理
+    shiftData.forEach(d => {
+      if(!d.date.startsWith(filterMonth)) return;
+      if(!dailyCount[d.date]) dailyCount[d.date] = { '瀬崎': 0, '櫛引': 0 };
+      
+      const store = d.assignedStore || (d.storeReq !== 'どちらでも可' && !d.storeReq.includes('、') && !d.storeReq.includes('・') ? d.storeReq : null);
+      if(store === '瀬崎') dailyCount[d.date]['瀬崎']++;
+      if(store === '櫛引') dailyCount[d.date]['櫛引']++;
+    });
+
+    const shortageList = document.getElementById('shortageList');
+    shortageList.innerHTML = '';
+    let hasShortage = false;
+
+    Object.keys(dailyCount).sort().forEach(date => {
+      const c = dailyCount[date];
+      const shortS = reqS - c['瀬崎'];
+      const shortK = reqK - c['櫛引'];
+      
+      if(shortS > 0 || shortK > 0) {
+        hasShortage = true;
+        let txt = `<strong style="width:100px; display:inline-block;">📅 ${date}</strong>`;
+        if(shortS > 0) txt += `<span style="color:var(--warning); font-weight:600; margin-right:12px;">瀬崎が ${shortS}名 不足 (現在${c['瀬崎']})</span>`;
+        if(shortK > 0) txt += `<span style="color:var(--warning); font-weight:600;">櫛引が ${shortK}名 不足 (現在${c['櫛引']})</span>`;
+        
+        const div = document.createElement('div');
+        div.className = 'shortage-item';
+        div.innerHTML = txt;
+        shortageList.appendChild(div);
+      }
+    });
+
+    if(!hasShortage) {
+      shortageList.innerHTML = `<div class="shortage-ok">✅ ベース人数（${reqS}名/${reqK}名）の不足はありません。（※細かい時間帯の状況はAI監査ルールと合わせて確認してください）</div>`;
     }
   }
 
   async function runAiAudit() {
     const filterMonth = document.getElementById('monthSelect').value;
     const ruleText = document.getElementById('aiAuditRule').value;
-
-    if(!ruleText.trim()) {
-      Swal.fire({ icon: 'warning', title: 'ルール未入力', text: 'AI監査ルールを入力してください。', background: '#1e272e', color: '#fff' });
-      return;
-    }
+    const reqS = document.getElementById('reqSezaki').value;
+    const reqK = document.getElementById('reqKushibiki').value;
 
     const payload = {
       targetMonth: filterMonth,
+      requiredBaseSezaki: reqS,
+      requiredBaseKushibiki: reqK,
       auditRule: ruleText,
       shifts: shiftData,
       roster: rosterData
@@ -468,7 +525,7 @@
 
     Swal.fire({
       title: 'AI監査・割当実行中...',
-      html: '設定されたルールに基づき、Geminiが時間帯ごとの人員配置を分析しています。<br>約10〜20秒かかります...',
+      html: 'ベース目安人数と特記事項ルールのハイブリッドで、Geminiが人員配置を分析しています。<br>約10〜20秒かかります...',
       allowOutsideClick: false,
       didOpen: () => { Swal.showLoading(); },
       background: '#1e272e', color: '#fff'
@@ -484,12 +541,11 @@
       
       const result = await res.json();
       
-      // result.assignments : [{ id: "...", assignedStore: "瀬崎" }]
       if(result.assignments && Array.isArray(result.assignments)) {
         result.assignments.forEach(a => {
           const row = shiftData.find(x => x.id === a.id);
           if(row && row.status === '希望中') {
-            row.assignedStore = a.assignedStore;
+            row.assignedStore = a.assignedStore; // 画面上のみ更新
           }
         });
       }
@@ -498,12 +554,11 @@
       if(result.reportText) {
         aiReportEl.innerHTML = result.reportText.replace(/\\n/g, '<br>');
         document.getElementById('aiSummaryArea').style.display = 'block';
-      } else {
-        document.getElementById('aiSummaryArea').style.display = 'none';
       }
 
       renderShiftTable();
-      Swal.fire({ icon: 'success', title: 'AI処理完了', text: '詳細な監査レポートが出力されました。推奨シフト案を画面に反映しています。', background: '#1e272e', color: '#fff' });
+      calculateShortages();
+      Swal.fire({ icon: 'success', title: 'AI処理完了', text: '詳細な監査レポートを出力し、推奨シフト配列を画面に反映しました。', background: '#1e272e', color: '#fff' });
 
     } catch(err) {
       Swal.fire({ icon: 'error', title: 'AI監査エラー', text: err.message, background: '#1e272e', color: '#fff' });
@@ -568,6 +623,7 @@
   function updateRowStore(id, val) {
     const row = shiftData.find(x => x.id === id);
     if(row) row.assignedStore = val;
+    calculateShortages();
   }
 
   async function saveSingleShift(id) {
@@ -580,6 +636,7 @@
     // Simulate Fetch save
     row.status = '有効';
     renderShiftTable();
+    calculateShortages();
     Swal.fire({ icon: 'success', title: '保存しました', toast: true, position: 'top-end', showConfirmButton: false, timer: 2000, background: '#1e272e', color: '#fff'});
   }
 
@@ -616,6 +673,7 @@
         });
         shiftData.forEach(d => { if(d.status === '希望中') d.status = '有効'; });
         renderShiftTable();
+        calculateShortages();
         Swal.fire({ title: '送信完了', text: '全員への確定通知がスケジュールされました。', icon: 'success', background: '#1e272e', color: '#fff' });
       } catch (err) {
         Swal.fire({ title: '通知エラー', text: err.message, icon: 'error', background: '#1e272e', color: '#fff' });
