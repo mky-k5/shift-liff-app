@@ -731,11 +731,10 @@
           <input type="number" class="input-styled" style="padding:6px 12px;" value="${user.wage}" onchange="updateRosterDataState('${user.uid}', 'wage', parseInt(this.value))">
           
           <div class="info-label">店舗</div>
-          <select class="select-styled" style="padding:6px 12px; width:100%;" onchange="updateRosterDataState('${user.uid}', 'store', this.value)">
-            <option value="瀬崎" ${user.store==='瀬崎'?'selected':''}>瀬崎</option>
-            <option value="櫛引" ${user.store==='櫛引'?'selected':''}>櫛引</option>
-            <option value="瀬崎・櫛引" ${user.store==='瀬崎・櫛引'?'selected':''}>瀬崎・櫛引</option>
-          </select>
+          <div style="display:flex; gap:12px; align-items:center;">
+             <label style="cursor:pointer; font-size:14px;"><input type="checkbox" onchange="toggleStore('${user.uid}', '瀬崎', this.checked)" ${(user.store||'').includes('瀬崎')?'checked':''}> 瀬崎</label>
+             <label style="cursor:pointer; font-size:14px;"><input type="checkbox" onchange="toggleStore('${user.uid}', '櫛引', this.checked)" ${(user.store||'').includes('櫛引')?'checked':''}> 櫛引</label>
+          </div>
           
           <div class="info-label" style="height:24px;">在籍状況</div>
           <label class="switch">
@@ -747,15 +746,37 @@
 
       let shiftsHtml = '';
       DAYS.forEach(day => {
-        const start = user.fixed[day][0];
-        const end = user.fixed[day][1];
+        const slots = user.fixed[day] || [];
+        let slotHtml = '';
+        if(slots.length === 0 || (slots.length === 2 && typeof slots[0] === 'string')) {
+           // fallback empty or legacy
+           const start = typeof slots[0] === 'string' ? slots[0] : '';
+           const end = typeof slots[1] === 'string' ? slots[1] : '';
+           slotHtml = `<div class="time-inputs" data-day="${day}" data-idx="0">
+             <input type="time" class="time-input" value="${start}" onchange="updateRosterTime('${user.uid}', '${day}', 0, 0, this.value)">
+             <span style="color:var(--text-muted)">-</span>
+             <input type="time" class="time-input" value="${end}" onchange="updateRosterTime('${user.uid}', '${day}', 0, 1, this.value)">
+             <button class="btn" style="padding:4px 8px; font-size:12px; background:rgba(255,255,255,0.1);" onclick="addSlot('${user.uid}', '${day}')">+</button>
+           </div>`;
+        } else {
+           slots.forEach((s, i) => {
+             slotHtml += `<div class="time-inputs" data-day="${day}" data-idx="${i}">
+               <input type="time" class="time-input" value="${s[0]||''}" onchange="updateRosterTime('${user.uid}', '${day}', ${i}, 0, this.value)">
+               <span style="color:var(--text-muted)">-</span>
+               <input type="time" class="time-input" value="${s[1]||''}" onchange="updateRosterTime('${user.uid}', '${day}', ${i}, 1, this.value)">
+               ${i === slots.length - 1 
+                 ? `<button class="btn" style="padding:4px 8px; font-size:12px; background:rgba(255,255,255,0.1);" onclick="addSlot('${user.uid}', '${day}')">+</button>`
+                 : `<button class="btn" style="padding:4px 10px; font-size:12px; background:rgba(255,71,87,0.2); color:var(--danger);" onclick="removeSlot('${user.uid}', '${day}', ${i})">&times;</button>`
+               }
+             </div>`;
+           });
+        }
+
         shiftsHtml += `
-          <div class="day-row">
-            <span class="day-label">${day}</span>
-            <div class="time-inputs">
-              <input type="time" class="time-input" value="${start}" onchange="updateRosterTime('${user.uid}', '${day}', 0, this.value)">
-              <span style="color:var(--text-muted)">-</span>
-              <input type="time" class="time-input" value="${end}" onchange="updateRosterTime('${user.uid}', '${day}', 1, this.value)">
+          <div class="day-row" style="align-items:flex-start;">
+            <span class="day-label" style="padding-top:6px;">${day}</span>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              ${slotHtml}
             </div>
           </div>
         `;
@@ -775,9 +796,48 @@
     });
   }
 
-  function updateRosterTime(uid, day, idx, val) {
+  function toggleStore(uid, storeName, isChecked) {
     const user = rosterData.find(x => x.uid === uid);
-    if(user) user.fixed[day][idx] = val;
+    if(!user) return;
+    let s = user.store || '';
+    if (isChecked) {
+      if(!s.includes(storeName)) s = s ? s + '・' + storeName : storeName;
+    } else {
+      s = s.replace(new RegExp(storeName + '・?|・?' + storeName), '');
+    }
+    user.store = s || '未設定';
+    renderRosterGrid();
+  }
+
+  function addSlot(uid, day) {
+    const user = rosterData.find(x => x.uid === uid);
+    if(!user) return;
+    if(!Array.isArray(user.fixed[day]) || (user.fixed[day].length===2 && typeof user.fixed[day][0]==='string')) {
+       // normalize it to 2D
+       user.fixed[day] = [ [user.fixed[day][0]||'', user.fixed[day][1]||''] ];
+    }
+    user.fixed[day].push(['', '']);
+    renderRosterGrid();
+  }
+  
+  function removeSlot(uid, day, idx) {
+    const user = rosterData.find(x => x.uid === uid);
+    if(!user) return;
+    if(Array.isArray(user.fixed[day]) && user.fixed[day].length > 1) {
+      user.fixed[day].splice(idx, 1);
+      renderRosterGrid();
+    }
+  }
+
+  function updateRosterTime(uid, day, slotIdx, timeIdx, val) {
+    const user = rosterData.find(x => x.uid === uid);
+    if(user) {
+      if(!Array.isArray(user.fixed[day]) || (user.fixed[day].length===2 && typeof user.fixed[day][0]==='string')) {
+         user.fixed[day] = [ [user.fixed[day][0]||'', user.fixed[day][1]||''] ];
+      }
+      if(!user.fixed[day][slotIdx]) user.fixed[day][slotIdx] = ['', ''];
+      user.fixed[day][slotIdx][timeIdx] = val;
+    }
   }
 
   async function saveAllRosters() {
