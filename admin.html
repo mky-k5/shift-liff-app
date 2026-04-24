@@ -709,8 +709,10 @@
     if (rosterData.length > 0) {
       if (!confirm('変更が保存されていない場合、リセットされます。名簿を再読込しますか？')) return;
     }
-    const grid = document.getElementById('rosterGrid');
-    grid.innerHTML = `<div style="padding: 20px;">読込中...（初回は数秒かかります）</div>`;
+    const listContainer = document.getElementById('rosterList');
+    const detailContainer = document.getElementById('rosterDetail');
+    if(listContainer) listContainer.innerHTML = `<div style="padding: 20px;">読込中...（初回は数秒かかります）</div>`;
+    if(detailContainer) detailContainer.innerHTML = '';
 
     try {
       const res = await fetch(WEBHOOK_FETCH_ROSTER);
