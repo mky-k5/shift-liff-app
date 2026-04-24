@@ -209,6 +209,9 @@
     .tab-pane.active { display: block; }
 
     @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
 
   </style>
 </head>
@@ -744,8 +747,23 @@
     }
 
     filtered.forEach(user => {
-      const card = document.createElement('div');
+      const card = document.createElement('details');
       card.className = 'roster-card';
+      
+      const summaryHtml = `
+        <summary style="cursor:pointer; outline:none; font-weight:bold; font-size:16px; display:flex; justify-content:space-between; align-items:center;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span style="font-size:16px; color:var(--primary);">▶</span>
+            <span style="font-size:18px;">${user.name}</span>
+            <span style="font-size:12px; color:var(--text-muted);">
+              ${user.store ? '['+user.store.replace(/・/g, ', ')+']' : '[店舗未設定]'}
+            </span>
+          </div>
+          <div style="font-size:13px; font-weight:normal; color:${user.active ? 'var(--success)' : 'var(--text-muted)'}">
+            ${user.active ? '● 在籍中' : '○ 休職/退職等'}
+          </div>
+        </summary>
+      `;
       
       const isActiveChecked = user.active === 1 ? 'checked' : '';
       const basicInfoHtml = `
@@ -811,13 +829,16 @@
       });
 
       card.innerHTML = `
-        ${basicInfoHtml}
-        <div class="separator"></div>
-        <div class="info-label" style="margin-bottom:12px;">固定シフト</div>
-        <div>${shiftsHtml}</div>
-        <div class="separator"></div>
-        <div style="text-align:right; margin-top:12px;">
-          <button class="btn" style="background:var(--danger); color:#fff; font-size:12px; padding:6px 12px; box-shadow:none;" onclick="resetUserData('${user.uid}', '${user.name}')">⚠️ このスタッフのデータをリセット</button>
+        ${summaryHtml}
+        <div style="margin-top:24px;">
+          ${basicInfoHtml}
+          <div class="separator"></div>
+          <div class="info-label" style="margin-bottom:12px;">固定シフト</div>
+          <div>${shiftsHtml}</div>
+          <div class="separator"></div>
+          <div style="text-align:right; margin-top:12px;">
+            <button class="btn" style="background:var(--danger); color:#fff; font-size:12px; padding:6px 12px; box-shadow:none;" onclick="resetUserData('${user.uid}', '${user.name}')">⚠️ このスタッフのデータをリセット</button>
+          </div>
         </div>
       `;
       grid.appendChild(card);
