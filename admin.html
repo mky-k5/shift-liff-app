@@ -722,9 +722,13 @@
 
   function updateSlotStore(uid, day, slotIdx, storeName) {
     const user = rosterData.find(x => x.uid === uid);
-    if (!user) return;
-    if (!Array.isArray(user.fixed[day][slotIdx])) return;
-    user.fixed[day][slotIdx][2] = storeName;
+    if(user) {
+      if(!Array.isArray(user.fixed[day]) || (user.fixed[day].length===2 && typeof user.fixed[day][0]==='string')) {
+        user.fixed[day] = [ [user.fixed[day][0]||'', user.fixed[day][1]||'', ''] ];
+      }
+      if(!user.fixed[day][slotIdx]) user.fixed[day][slotIdx] = ['', '', ''];
+      user.fixed[day][slotIdx][2] = storeName;
+    }
   }
 
   function renderRosterGrid() {
@@ -778,6 +782,7 @@
              <input type="time" class="time-input" value="${start}" onchange="updateRosterTime('${user.uid}', '${day}', 0, 0, this.value)">
              <span style="color:var(--text-muted)">-</span>
              <input type="time" class="time-input" value="${end}" onchange="updateRosterTime('${user.uid}', '${day}', 0, 1, this.value)">
+             ${buildStoreSelector(user.uid, day, 0, '')}
              <button class="btn" style="padding:4px 8px; font-size:12px; background:rgba(255,255,255,0.1);" onclick="addSlot('${user.uid}', '${day}')">+</button>
            </div>`;
         } else {
