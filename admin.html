@@ -687,6 +687,9 @@
   const DAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
   async function loadRosterData() {
+    if (rosterData.length > 0) {
+      if (!confirm('変更が保存されていない場合、リセットされます。名簿を再読込しますか？')) return;
+    }
     const grid = document.getElementById('rosterGrid');
     grid.innerHTML = `<div style="padding: 20px;">読込中...（初回は数秒かかります）</div>`;
 
@@ -703,6 +706,25 @@
   function updateRosterDataState(uid, key, val) {
     const user = rosterData.find(x => x.uid === uid);
     if(user) user[key] = val;
+  }
+
+  function buildStoreSelector(uid, day, slotIdx, storeVal) {
+    const user = rosterData.find(x => x.uid === uid);
+    const stores = (user.store || '').split('・').filter(s => s && s !== '未設定');
+    if (stores.length <= 1) {
+      const label = stores[0] || '未設定';
+      return `<span style="font-size:12px; color:var(--text-muted); padding:0 6px;">[${label}]</span>`;
+    }
+    const options = `<option value="">(店舗を選択)</option>` +
+      stores.map(s => `<option value="${s}" ${storeVal === s ? 'selected' : ''}>${s}</option>`).join('');
+    return `<select class="select-styled" style="width:110px; padding:4px 8px; font-size:13px;" onchange="updateSlotStore('${uid}', '${day}', ${slotIdx}, this.value)">${options}</select>`;
+  }
+
+  function updateSlotStore(uid, day, slotIdx, storeName) {
+    const user = rosterData.find(x => x.uid === uid);
+    if (!user) return;
+    if (!Array.isArray(user.fixed[day][slotIdx])) return;
+    user.fixed[day][slotIdx][2] = storeName;
   }
 
   function renderRosterGrid() {
@@ -759,11 +781,12 @@
              <button class="btn" style="padding:4px 8px; font-size:12px; background:rgba(255,255,255,0.1);" onclick="addSlot('${user.uid}', '${day}')">+</button>
            </div>`;
         } else {
-           slots.forEach((s, i) => {
+             slots.forEach((s, i) => {
              slotHtml += `<div class="time-inputs" data-day="${day}" data-idx="${i}">
                <input type="time" class="time-input" value="${s[0]||''}" onchange="updateRosterTime('${user.uid}', '${day}', ${i}, 0, this.value)">
                <span style="color:var(--text-muted)">-</span>
                <input type="time" class="time-input" value="${s[1]||''}" onchange="updateRosterTime('${user.uid}', '${day}', ${i}, 1, this.value)">
+               ${buildStoreSelector(user.uid, day, i, s[2]||'')}
                ${i === slots.length - 1 
                  ? `<button class="btn" style="padding:4px 8px; font-size:12px; background:rgba(255,255,255,0.1);" onclick="addSlot('${user.uid}', '${day}')">+</button>`
                  : `<button class="btn" style="padding:4px 10px; font-size:12px; background:rgba(255,71,87,0.2); color:var(--danger);" onclick="removeSlot('${user.uid}', '${day}', ${i})">&times;</button>`
@@ -804,6 +827,12 @@
       if(!s.includes(storeName)) s = s ? s + '・' + storeName : storeName;
     } else {
       s = s.replace(new RegExp(storeName + '・?|・?' + storeName), '');
+      // クリーンアップ
+      Object.keys(user.fixed).forEach(day => {
+        (user.fixed[day] || []).forEach(slot => {
+          if (Array.isArray(slot) && slot[2] === storeName) slot[2] = '';
+        });
+      });
     }
     user.store = s || '未設定';
     renderRosterGrid();
@@ -814,9 +843,9 @@
     if(!user) return;
     if(!Array.isArray(user.fixed[day]) || (user.fixed[day].length===2 && typeof user.fixed[day][0]==='string')) {
        // normalize it to 2D
-       user.fixed[day] = [ [user.fixed[day][0]||'', user.fixed[day][1]||''] ];
+       user.fixed[day] = [ [user.fixed[day][0]||'', user.fixed[day][1]||'', ''] ];
     }
-    user.fixed[day].push(['', '']);
+    user.fixed[day].push(['', '', '']);
     renderRosterGrid();
   }
   
@@ -833,14 +862,37 @@
     const user = rosterData.find(x => x.uid === uid);
     if(user) {
       if(!Array.isArray(user.fixed[day]) || (user.fixed[day].length===2 && typeof user.fixed[day][0]==='string')) {
-         user.fixed[day] = [ [user.fixed[day][0]||'', user.fixed[day][1]||''] ];
+         user.fixed[day] = [ [user.fixed[day][0]||'', user.fixed[day][1]||'', ''] ];
       }
-      if(!user.fixed[day][slotIdx]) user.fixed[day][slotIdx] = ['', ''];
+      if(!user.fixed[day][slotIdx]) user.fixed[day][slotIdx] = ['', '', ''];
       user.fixed[day][slotIdx][timeIdx] = val;
     }
   }
 
   async function saveAllRosters() {
+    // Validation
+    try {
+      for (const user of rosterData) {
+        const stores = (user.store || '').split('・').filter(s => s && s !== '未設定');
+        for (const day of DAYS) {
+          const slots = user.fixed[day] || [];
+          for (let i=0; i<slots.length; i++) {
+            const slot = slots[i];
+            if (Array.isArray(slot) && (slot[0] || slot[1])) {
+              if (stores.length === 1) {
+                user.fixed[day][i][2] = stores[0]; // Auto-assign singleton
+              } else if (stores.length > 1 && !slot[2]) {
+                throw new Error(`${user.name} さんの ${day}曜日の固定シフトに「店舗」が設定されていません。`);
+              }
+            }
+          }
+        }
+      }
+    } catch(err) {
+      Swal.fire({ icon: 'warning', title: '保存前エラー', text: err.message, background: '#1e272e', color: '#fff' });
+      return;
+    }
+
     Swal.fire({ title: '保存中...', allowOutsideClick: false, showConfirmButton: false, didOpen:()=>{Swal.showLoading();}, background: '#1e272e', color: '#fff' });
     
     try {
