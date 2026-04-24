@@ -185,10 +185,24 @@
     input:checked + .slider { background-color: rgba(46, 213, 115, 0.3); border-color: var(--success); }
     input:checked + .slider:before { transform: translateX(20px); background-color: var(--success); }
 
-    /* Roster Form Grid */
-    .roster-grid { display: grid; gap: 24px; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); }
+    /* Roster Form Layout */
+    .roster-layout { display: flex; gap: 24px; align-items: flex-start; }
+    .roster-layout-left { flex: 0 0 250px; display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 200px); overflow-y: auto; padding-right: 8px; }
+    .roster-layout-right { flex: 1; }
+
+    @media (max-width: 768px) {
+      .roster-layout { flex-direction: column; }
+      .roster-layout-left { flex: none; width: 100%; max-height: 250px; }
+    }
+
+    .roster-list-item {
+      padding: 12px 16px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--card-border);
+      cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s;
+    }
+    .roster-list-item:hover { background: rgba(255,255,255,0.08); }
+    .roster-list-item.active { background: rgba(0, 210, 255, 0.1); border-color: var(--primary); border-left: 4px solid var(--primary); }
+
     .roster-card { padding: 24px; border-radius: 16px; border: 1px solid var(--card-border); background: var(--card-bg); transition: 0.3s; }
-    .roster-card:hover { border-color: rgba(0, 210, 255, 0.3); box-shadow: 0 4px 20px rgba(0,0,0,0.4); }
     
     .roster-info-grid { display: grid; grid-template-columns: 80px 1fr; gap: 12px; align-items: center; margin-bottom: 20px; font-size: 14px; }
     .info-label { color: var(--text-muted); font-weight: 500; }
@@ -357,8 +371,9 @@
           <button class="btn btn-primary" onclick="loadRosterData()" style="background: rgba(255,255,255,0.1); box-shadow: none;">🔄 名簿再読込</button>
         </div>
 
-        <div class="roster-grid" id="rosterGrid">
-          <!-- Rendered via JS -->
+        <div class="roster-layout" id="rosterLayout">
+          <div class="roster-layout-left" id="rosterList"></div>
+          <div class="roster-layout-right" id="rosterDetail"></div>
         </div>
       </section>
 
@@ -385,6 +400,7 @@
   let shiftData = [];
   let rosterData = [];
   let currentUser = null;
+  let selectedRosterUid = null;
 
   // ==========================================
   // INITIALIZATION & AUTHENTICATION
@@ -735,36 +751,46 @@
   }
 
   function renderRosterGrid() {
-    const grid = document.getElementById('rosterGrid');
+    const listContainer = document.getElementById('rosterList');
+    const detailContainer = document.getElementById('rosterDetail');
+    if(!listContainer || !detailContainer) return;
+    
     const searchVal = document.getElementById('searchRoster').value.toLowerCase();
-    grid.innerHTML = '';
+    listContainer.innerHTML = '';
+    detailContainer.innerHTML = '';
 
     const filtered = rosterData.filter(u => u.name.toLowerCase().includes(searchVal));
 
     if(filtered.length === 0) {
-      grid.innerHTML = `<div style="padding:20px; color:var(--text-muted);">一致するスタッフがいません</div>`;
+      listContainer.innerHTML = `<div style="padding:20px; color:var(--text-muted);">一致するスタッフがいません</div>`;
       return;
     }
 
+    if(!selectedRosterUid || !filtered.find(u => u.uid === selectedRosterUid)) {
+      selectedRosterUid = filtered[0].uid;
+    }
+
     filtered.forEach(user => {
-      const card = document.createElement('details');
-      card.className = 'roster-card';
-      
-      const summaryHtml = `
-        <summary style="cursor:pointer; outline:none; font-weight:bold; font-size:16px; display:flex; justify-content:space-between; align-items:center;">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <span style="font-size:16px; color:var(--primary);">▶</span>
-            <span style="font-size:18px;">${user.name}</span>
-            <span style="font-size:12px; color:var(--text-muted);">
-              ${user.store ? '['+user.store.replace(/・/g, ', ')+']' : '[店舗未設定]'}
-            </span>
-          </div>
-          <div style="font-size:13px; font-weight:normal; color:${user.active ? 'var(--success)' : 'var(--text-muted)'}">
-            ${user.active ? '● 在籍中' : '○ 休職/退職等'}
-          </div>
-        </summary>
+      const item = document.createElement('div');
+      item.className = 'roster-list-item ' + (user.uid === selectedRosterUid ? 'active' : '');
+      item.onclick = () => {
+        selectedRosterUid = user.uid;
+        renderRosterGrid();
+      };
+      item.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="color:${user.active ? 'var(--success)' : 'var(--text-muted)'}; font-size:10px;">●</span>
+          <span style="font-weight:600; font-size:14px;">${user.name}</span>
+        </div>
+        <div style="font-size:11px; color:var(--text-muted);">
+          ${user.store ? user.store.replace(/・/g, ', ') : '店舗未定'}
+        </div>
       `;
-      
+      listContainer.appendChild(item);
+    });
+
+    const user = filtered.find(u => u.uid === selectedRosterUid);
+    if(user) {
       const isActiveChecked = user.active === 1 ? 'checked' : '';
       const basicInfoHtml = `
         <div class="roster-info-grid">
@@ -793,7 +819,6 @@
         const slots = user.fixed[day] || [];
         let slotHtml = '';
         if(slots.length === 0 || (slots.length === 2 && typeof slots[0] === 'string')) {
-           // fallback empty or legacy
            const start = typeof slots[0] === 'string' ? slots[0] : '';
            const end = typeof slots[1] === 'string' ? slots[1] : '';
            slotHtml = `<div class="time-inputs" data-day="${day}" data-idx="0">
@@ -828,21 +853,22 @@
         `;
       });
 
+      const card = document.createElement('div');
+      card.className = 'roster-card';
+      card.style.margin = '0';
       card.innerHTML = `
-        ${summaryHtml}
-        <div style="margin-top:24px;">
-          ${basicInfoHtml}
-          <div class="separator"></div>
-          <div class="info-label" style="margin-bottom:12px;">固定シフト</div>
-          <div>${shiftsHtml}</div>
-          <div class="separator"></div>
-          <div style="text-align:right; margin-top:12px;">
-            <button class="btn" style="background:var(--danger); color:#fff; font-size:12px; padding:6px 12px; box-shadow:none;" onclick="resetUserData('${user.uid}', '${user.name}')">⚠️ このスタッフのデータをリセット</button>
-          </div>
+        <h2 style="font-size:18px; margin-bottom:20px; color:var(--primary); font-weight:600;">${user.name} さんの設定</h2>
+        ${basicInfoHtml}
+        <div class="separator"></div>
+        <div class="info-label" style="margin-bottom:12px;">固定シフト</div>
+        <div>${shiftsHtml}</div>
+        <div class="separator"></div>
+        <div style="text-align:right; margin-top:12px;">
+          <button class="btn" style="background:var(--danger); color:#fff; font-size:12px; padding:6px 12px; box-shadow:none;" onclick="resetUserData('${user.uid}', '${user.name}')">⚠️ このスタッフのデータをリセット</button>
         </div>
       `;
-      grid.appendChild(card);
-    });
+      detailContainer.appendChild(card);
+    }
   }
 
   function toggleStore(uid, storeName, isChecked) {
