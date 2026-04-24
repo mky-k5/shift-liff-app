@@ -187,13 +187,22 @@
 
     /* Roster Form Layout */
     .roster-layout { display: flex; gap: 24px; align-items: flex-start; }
+    .roster-layout-filter { flex: 0 0 160px; display: flex; flex-direction: column; gap: 8px; }
     .roster-layout-left { flex: 0 0 250px; display: flex; flex-direction: column; gap: 8px; max-height: calc(100vh - 200px); overflow-y: auto; padding-right: 8px; }
     .roster-layout-right { flex: 1; }
 
     @media (max-width: 768px) {
       .roster-layout { flex-direction: column; }
+      .roster-layout-filter { flex: none; width: 100%; flex-direction: row; flex-wrap: wrap; }
       .roster-layout-left { flex: none; width: 100%; max-height: 250px; }
     }
+
+    .store-filter-btn { padding: 10px 16px; border-radius: 8px; background: rgba(255,255,255,0.05); color: var(--text-muted); cursor: pointer; transition: 0.2s; border: 1px solid var(--card-border); text-align: left; }
+    .store-filter-btn:hover { background: rgba(255,255,255,0.1); }
+    .store-filter-btn.active { background: rgba(0, 210, 255, 0.15); color: #fff; border-color: var(--primary); font-weight: bold; }
+
+    .reorder-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px; font-size: 12px; }
+    .reorder-btn:hover { color: #fff; }
 
     .roster-list-item {
       padding: 12px 16px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--card-border);
@@ -372,6 +381,7 @@
         </div>
 
         <div class="roster-layout" id="rosterLayout">
+          <div class="roster-layout-filter" id="storeFilter"></div>
           <div class="roster-layout-left" id="rosterList"></div>
           <div class="roster-layout-right" id="rosterDetail"></div>
         </div>
@@ -401,6 +411,7 @@
   let rosterData = [];
   let currentUser = null;
   let selectedRosterUid = null;
+  let selectedStoreFilter = 'すべて';
 
   // ==========================================
   // INITIALIZATION & AUTHENTICATION
@@ -700,6 +711,46 @@
     }
   }
 
+  function selectRoster(uid) {
+    selectedRosterUid = uid;
+    renderRosterGrid();
+  }
+
+  function moveStaff(uid, direction) {
+    const searchVal = document.getElementById('searchRoster').value.toLowerCase();
+    const filteredOpts = rosterData.filter(u => {
+      const matchSearch = u.name.toLowerCase().includes(searchVal);
+      const matchStore = (selectedStoreFilter === 'すべて') || (u.store||'').includes(selectedStoreFilter);
+      return matchSearch && matchStore;
+    });
+
+    const currentVisIdx = filteredOpts.findIndex(u => u.uid === uid);
+    if(currentVisIdx < 0) return;
+    
+    const targetVisIdx = currentVisIdx + direction;
+    if(targetVisIdx < 0 || targetVisIdx >= filteredOpts.length) return;
+
+    const currentUserObj = filteredOpts[currentVisIdx];
+    const targetUserObj = filteredOpts[targetVisIdx];
+
+    const currentGlobIdx = rosterData.findIndex(u => u.uid === currentUserObj.uid);
+    const targetGlobIdx = rosterData.findIndex(u => u.uid === targetUserObj.uid);
+
+    if(currentGlobIdx !== -1 && targetGlobIdx !== -1) {
+      rosterData.splice(currentGlobIdx, 1);
+      const newTargetGlobIdx = rosterData.findIndex(u => u.uid === targetUserObj.uid);
+      
+      if(direction === -1) {
+         rosterData.splice(newTargetGlobIdx, 0, currentUserObj);
+      } else {
+         rosterData.splice(newTargetGlobIdx + 1, 0, currentUserObj);
+      }
+      
+      rosterData.forEach((u, index) => { u.sort_order = index; });
+      renderRosterGrid();
+    }
+  }
+
   // ==========================================
   // TAB 2: ROSTER & FIXED SHIFTS
   // ==========================================
@@ -757,11 +808,31 @@
     const detailContainer = document.getElementById('rosterDetail');
     if(!listContainer || !detailContainer) return;
     
+    const filterContainer = document.getElementById('storeFilter');
+    if (filterContainer) {
+      const allStores = Array.from(new Set(rosterData.flatMap(u => (u.store||'').split('・')))).filter(s => s && s !== '未設定');
+      const filterOptions = ['すべて', ...allStores];
+      filterContainer.innerHTML = '';
+      filterOptions.forEach(store => {
+        const btn = document.createElement('button');
+        btn.className = 'store-filter-btn ' + (selectedStoreFilter === store ? 'active' : '');
+        btn.textContent = store;
+        btn.onclick = () => { selectedStoreFilter = store; renderRosterGrid(); };
+        filterContainer.appendChild(btn);
+      });
+    }
+
     const searchVal = document.getElementById('searchRoster').value.toLowerCase();
     listContainer.innerHTML = '';
     detailContainer.innerHTML = '';
 
-    const filtered = rosterData.filter(u => u.name.toLowerCase().includes(searchVal));
+    rosterData.sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
+
+    const filtered = rosterData.filter(u => {
+      const matchSearch = u.name.toLowerCase().includes(searchVal);
+      const matchStore = (selectedStoreFilter === 'すべて') || (u.store||'').includes(selectedStoreFilter);
+      return matchSearch && matchStore;
+    });
 
     if(filtered.length === 0) {
       listContainer.innerHTML = `<div style="padding:20px; color:var(--text-muted);">一致するスタッフがいません</div>`;
@@ -772,20 +843,21 @@
       selectedRosterUid = filtered[0].uid;
     }
 
-    filtered.forEach(user => {
+    filtered.forEach((user, idx) => {
       const item = document.createElement('div');
       item.className = 'roster-list-item ' + (user.uid === selectedRosterUid ? 'active' : '');
-      item.onclick = () => {
-        selectedRosterUid = user.uid;
-        renderRosterGrid();
-      };
+      
+      const isFirst = idx === 0;
+      const isLast = idx === filtered.length - 1;
+
       item.innerHTML = `
-        <div style="display:flex; align-items:center; gap:8px;">
+        <div style="display:flex; align-items:center; gap:8px; flex: 1; cursor:pointer;" onclick="selectRoster('${user.uid}')">
           <span style="color:${user.active ? 'var(--success)' : 'var(--text-muted)'}; font-size:10px;">●</span>
           <span style="font-weight:600; font-size:14px;">${user.name}</span>
         </div>
-        <div style="font-size:11px; color:var(--text-muted);">
-          ${user.store ? user.store.replace(/・/g, ', ') : '店舗未定'}
+        <div style="display:flex; flex-direction:column; align-items:center;">
+          <button class="reorder-btn" onclick="moveStaff('${user.uid}', -1)" ${isFirst ? 'style="visibility:hidden;"' : ''}>▲</button>
+          <button class="reorder-btn" onclick="moveStaff('${user.uid}', 1)" ${isLast ? 'style="visibility:hidden;"' : ''}>▼</button>
         </div>
       `;
       listContainer.appendChild(item);
@@ -926,6 +998,7 @@
   async function saveAllRosters() {
     // Validation
     try {
+      rosterData.forEach((u, index) => { u.sort_order = index; });
       for (const user of rosterData) {
         const stores = (user.store || '').split('・').filter(s => s && s !== '未設定');
         for (const day of DAYS) {
