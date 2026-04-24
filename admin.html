@@ -751,6 +751,33 @@
     }
   }
 
+  function moveStaffTo(fromUid, toUid, placeAfter) {
+    if(fromUid === toUid) return;
+    
+    // We directly manipulate global rosterData (simpler mapping)
+    // We get indices to ensure target hasn't completely shifted
+    const currentGlobIdx = rosterData.findIndex(u => u.uid === fromUid);
+    if(currentGlobIdx === -1) return;
+    const currentUserObj = rosterData[currentGlobIdx];
+    
+    rosterData.splice(currentGlobIdx, 1);
+
+    const targetGlobIdx = rosterData.findIndex(u => u.uid === toUid);
+    if(targetGlobIdx !== -1) {
+      if(placeAfter) {
+         rosterData.splice(targetGlobIdx + 1, 0, currentUserObj);
+      } else {
+         rosterData.splice(targetGlobIdx, 0, currentUserObj);
+      }
+    } else {
+      // fallback
+      rosterData.push(currentUserObj);
+    }
+    
+    rosterData.forEach((u, index) => { u.sort_order = index; });
+    renderRosterGrid();
+  }
+
   // ==========================================
   // TAB 2: ROSTER & FIXED SHIFTS
   // ==========================================
@@ -846,6 +873,45 @@
     filtered.forEach((user, idx) => {
       const item = document.createElement('div');
       item.className = 'roster-list-item ' + (user.uid === selectedRosterUid ? 'active' : '');
+      item.draggable = true;
+      item.ondragstart = (e) => {
+        e.dataTransfer.setData('text/plain', user.uid);
+        item.style.opacity = '0.5';
+      };
+      item.ondragend = (e) => {
+        item.style.opacity = '1';
+        document.querySelectorAll('.roster-list-item').forEach(el => el.style.borderTop = '');
+        document.querySelectorAll('.roster-list-item').forEach(el => el.style.borderBottom = '');
+      };
+      item.ondragover = (e) => {
+        e.preventDefault(); // allow drop
+        const rect = item.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        if (y < rect.height / 2) {
+           item.style.borderTop = '2px solid var(--primary)';
+           item.style.borderBottom = '';
+        } else {
+           item.style.borderBottom = '2px solid var(--primary)';
+           item.style.borderTop = '';
+        }
+      };
+      item.ondragleave = (e) => {
+        item.style.borderTop = '';
+        item.style.borderBottom = '';
+      };
+      item.ondrop = (e) => {
+        e.preventDefault();
+        item.style.borderTop = '';
+        item.style.borderBottom = '';
+        const fromUid = e.dataTransfer.getData('text/plain');
+        if(!fromUid || fromUid === user.uid) return;
+        
+        const rect = item.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        const placeAfter = y >= rect.height / 2;
+        
+        moveStaffTo(fromUid, user.uid, placeAfter);
+      };
       
       const isFirst = idx === 0;
       const isLast = idx === filtered.length - 1;
@@ -861,8 +927,8 @@
           </div>
         </div>
         <div style="display:flex; flex-direction:column; align-items:center;">
-          <button class="reorder-btn" onclick="moveStaff('${user.uid}', -1)" ${isFirst ? 'style="visibility:hidden;"' : ''}>▲</button>
-          <button class="reorder-btn" onclick="moveStaff('${user.uid}', 1)" ${isLast ? 'style="visibility:hidden;"' : ''}>▼</button>
+          <button class="reorder-btn" onclick="moveStaff('${user.uid}', -1)" ${isFirst ? 'style="visibility:hidden;"' : ''} title="上へ移動">▲</button>
+          <button class="reorder-btn" onclick="moveStaff('${user.uid}', 1)" ${isLast ? 'style="visibility:hidden;"' : ''} title="下へ移動">▼</button>
         </div>
       `;
       listContainer.appendChild(item);
