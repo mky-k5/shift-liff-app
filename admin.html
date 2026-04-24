@@ -89,7 +89,7 @@
     .brand {
       display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 22px;
       background: linear-gradient(135deg, var(--primary), var(--accent));
-      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
     }
     .brand-icon {
       width: 36px; height: 36px; border-radius: 10px;
@@ -851,9 +851,14 @@
       const isLast = idx === filtered.length - 1;
 
       item.innerHTML = `
-        <div style="display:flex; align-items:center; gap:8px; flex: 1; cursor:pointer;" onclick="selectRoster('${user.uid}')">
-          <span style="color:${user.active ? 'var(--success)' : 'var(--text-muted)'}; font-size:10px;">●</span>
-          <span style="font-weight:600; font-size:14px;">${user.name}</span>
+        <div style="display:flex; flex-direction:column; flex: 1; cursor:pointer;" onclick="selectRoster('${user.uid}')">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="color:${user.active ? 'var(--success)' : 'var(--text-muted)'}; font-size:10px;">●</span>
+            <span style="font-weight:600; font-size:14px;">${user.name}</span>
+          </div>
+          <div style="font-size:11px; color:var(--text-muted); margin-top:2px; margin-left:18px;">
+            ${user.store ? user.store.replace(/・/g, ', ') : '店舗未定'}
+          </div>
         </div>
         <div style="display:flex; flex-direction:column; align-items:center;">
           <button class="reorder-btn" onclick="moveStaff('${user.uid}', -1)" ${isFirst ? 'style="visibility:hidden;"' : ''}>▲</button>
